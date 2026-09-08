@@ -3,312 +3,461 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WRF Domain 3 Visualization Dashboard</title>
-    
-    <!-- Leaflet CSS & JS for Open Source Basemaps -->
+    <title>HydroClim Cast | Regional Forecast Intelligence</title>
+
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500;600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
     <style>
         :root {
-            --bg-color: #111827;
-            --panel-color: #1f2937;
-            --text-color: #f3f4f6;
-            --accent-color: #3b82f6;
-            --border-color: #374151;
+            --ink: #eef2f8;
+            --muted: #90a0b8;
+            --teal: #22d3c5;
+            --canvas: #0a0f18;
+            --line: rgba(255, 255, 255, 0.09);
+            --panel-bg: rgba(15, 21, 32, 0.82);
         }
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        html, body {
+            height: 100%;
+            overflow: hidden;
+            font-family: Manrope, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: var(--canvas);
+            color: var(--ink);
         }
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            height: 100vh;
+        /* Full-bleed map fills the entire viewport; every control floats above it */
+        #map {
+            position: fixed;
+            inset: 0;
+            z-index: 1;
+            background: #0a0f18;
+        }
+
+        .leaflet-container { font-family: Manrope, sans-serif; background: #0a0f18; }
+        .leaflet-control-zoom { border: 0 !important; box-shadow: 0 6px 20px rgba(0,0,0,0.4) !important; }
+        .leaflet-control-zoom a {
+            background: var(--panel-bg) !important;
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--line) !important;
+            color: var(--ink) !important;
+        }
+        .leaflet-control-zoom a:hover { background: rgba(34, 211, 197, 0.15) !important; }
+        .leaflet-control-attribution {
+            background: rgba(10, 15, 24, 0.7) !important;
+            color: var(--muted) !important;
+            backdrop-filter: blur(6px);
+        }
+        .leaflet-control-attribution a { color: #7fdcd3 !important; }
+
+        /* Glass panel base */
+        .glass {
+            background: var(--panel-bg);
+            backdrop-filter: blur(16px) saturate(140%);
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            box-shadow: 0 12px 32px rgba(0,0,0,0.45);
+        }
+
+        /* Top bar */
+        .topbar {
+            position: fixed;
+            top: 14px; left: 14px; right: 14px;
+            height: 42px;
+            z-index: 500;
+            display: flex;
+            align-items: center;
+            padding: 0 14px;
+            gap: 10px;
+        }
+        .brand { display: flex; align-items: center; gap: 8px; }
+        .brand-mark {
+            width: 26px; height: 26px;
+            border-radius: 7px;
+            display: grid; place-items: center;
+            background: linear-gradient(135deg, var(--teal), #1a7f76);
+            font-size: 14px;
+        }
+        .brand-copy strong { display: block; font-size: 12.5px; letter-spacing: -0.2px; line-height: 1.2; }
+        .brand-copy small { display: block; color: var(--muted); font-size: 9px; margin-top: 0; }
+
+        .unit-toggle {
+            display: flex; gap: 2px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid var(--line);
+            border-radius: 20px;
+            padding: 3px;
+        }
+        .unit-toggle button {
+            border: 0; background: transparent; color: var(--muted);
+            padding: 5px 12px; border-radius: 16px; font: 600 11px 'DM Mono', monospace;
+            cursor: pointer;
+        }
+        .unit-toggle button.active { background: var(--teal); color: #06201d; }
+
+        .status-pill {
+            margin-left: auto;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid var(--line);
+            padding: 7px 14px;
+            border-radius: 20px;
+            font: 600 11px 'DM Mono', monospace;
+            color: var(--muted);
+            display: flex; align-items: center; gap: 7px;
+        }
+        .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #4ade80; box-shadow: 0 0 8px 1px rgba(74,222,128,0.7); }
+
+        /* Layer picker — floating top-left */
+        .layer-panel {
+            position: fixed;
+            top: 88px; left: 18px;
+            width: 270px;
+            z-index: 400;
+            max-height: calc(100vh - 200px);
             display: flex;
             flex-direction: column;
             overflow: hidden;
         }
+        .layer-panel-head {
+            display: flex; align-items: center; gap: 10px;
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--line);
+            font: 700 12px 'DM Mono', monospace;
+            letter-spacing: 1px;
+            color: var(--ink);
+            cursor: pointer;
+            user-select: none;
+        }
+        .layer-panel-head .chevron { margin-left: auto; color: var(--muted); transition: transform 0.2s; }
+        .layer-panel.collapsed .layer-panel-body { display: none; }
+        .layer-panel.collapsed .chevron { transform: rotate(-90deg); }
 
-        .sidebar-title {
-            font-size: 1.25rem;
-            font-weight: 600;
-            letter-spacing: -0.025em;
-            padding-bottom: 0.5rem;
-            border-bottom: 1px solid var(--border-color);
-            margin-bottom: 0.5rem;
-            text-align: center;
+        .layer-panel-body {
+            padding: 14px 16px 16px;
+            overflow-y: auto;
         }
 
-        .city-select {
-            background-color: #374151;
-            color: var(--text-color);
-            border: 1px solid #4b5563;
-            padding: 0.5rem 1rem;
-            border-radius: 0.5rem;
-            font-size: 0.95rem;
-            font-weight: 500;
+        .field-block { margin-bottom: 14px; }
+        .field-block:last-child { margin-bottom: 0; }
+        .field-block label {
+            display: block; font: 600 10px 'DM Mono', monospace;
+            letter-spacing: 1.2px; color: var(--muted); margin-bottom: 7px;
+        }
+
+        select.control-select {
+            background: rgba(255,255,255,0.05);
+            color: var(--ink);
+            border: 1px solid var(--line);
+            padding: 0.6rem 0.8rem;
+            border-radius: 9px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            width: 100%;
             cursor: pointer;
             outline: none;
-            width: 100%;
             appearance: none;
-            background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'%3E%3Cpath fill='%239ca3af' d='M2 0L0 2h4zm0 5L0 3h4z'/%3E%3C/svg%3E");
+            background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'%3E%3Cpath fill='%2390a0b8' d='M2 0L0 2h4zm0 5L0 3h4z'/%3E%3C/svg%3E");
             background-repeat: no-repeat;
-            background-position: right 0.75rem center;
+            background-position: right 0.8rem center;
             background-size: 8px 10px;
+            transition: border-color 0.15s;
+        }
+        select.control-select:hover { border-color: rgba(255,255,255,0.25); }
+        select.control-select:focus { border-color: var(--teal); box-shadow: 0 0 0 3px rgba(34,211,197,0.2); }
+        select.control-select option {
+            background: #10161f;
+            color: var(--ink);
         }
 
-        .city-select:focus {
-            border-color: var(--accent-color);
-            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
-        }
-
-        .main-container {
-            flex: 1;
-            display: flex;
-            flex-direction: row;
-            padding: 1.5rem;
-            gap: 1.5rem;
-            background: var(--bg-color);
-            overflow: hidden;
-        }
-
-        .sidebar-left {
-            display: flex;
-            flex-direction: column;
-            gap: 0.75rem;
-            width: 220px;
-            z-index: 10;
-        }
-
+        .variable-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
         .var-btn {
-            background-color: var(--panel-color);
-            color: var(--text-color);
-            border: 1px solid var(--border-color);
-            padding: 1rem;
-            border-radius: 0.5rem;
-            font-size: 0.9rem;
-            cursor: pointer;
-            text-align: left;
-            transition: all 0.2s;
+            background: rgba(255,255,255,0.04); color: var(--ink);
+            border: 1px solid var(--line); padding: 10px 10px;
+            border-radius: 8px; font-size: 0.76rem; font-weight: 500;
+            display: flex; align-items: center; justify-content: center; gap: 6px;
+            cursor: pointer; transition: all 0.18s;
             font-family: inherit;
         }
-
-        .var-btn:hover {
-            border-color: #6b7280;
-        }
-
+        .var-btn:hover:not(:disabled) { border-color: rgba(34,211,197,0.4); color: var(--teal); }
         .var-btn.active {
-            background-color: var(--accent-color);
-            border-color: var(--accent-color);
-            font-weight: bold;
+            background: var(--teal); border-color: var(--teal);
+            color: #06201d; font-weight: 700;
+            box-shadow: 0 4px 14px rgba(34,211,197,0.35);
         }
+        .var-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
-        .map-wrapper {
-            flex: 1;
-            position: relative;
-            border-radius: 1rem;
-            overflow: hidden;
-            border: 1px solid var(--border-color);
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+        .run-forecast-btn {
+            width: 100%; border: 1px dashed rgba(251,191,36,0.5);
+            background: rgba(251,191,36,0.08); color: #fbbf6a;
+            border-radius: 9px; padding: 10px; margin-top: 8px;
+            font: 600 11px 'DM Mono', monospace; letter-spacing: 0.5px;
+            cursor: pointer; transition: all 0.18s;
         }
-        
-        #map {
-            width: 100%;
-            height: 100%;
-            z-index: 1;
-        }
+        .run-forecast-btn:hover { background: rgba(251,191,36,0.14); }
+        .run-forecast-btn.queued { border-style: solid; border-color: #fbbf24; color: #fbbf24; cursor: default; }
 
-        .colorbar-container {
-            background-color: var(--panel-color);
-            border: 1px solid var(--border-color);
-            padding: 1.5rem 1rem;
-            border-radius: 1rem;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 1rem;
-            z-index: 10;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
-            min-width: 90px;
+        /* Info card — floating top-right (WeatherEx "Your Area" style) */
+        .info-card {
+            position: fixed;
+            top: 88px; right: 18px;
+            width: 210px;
+            z-index: 400;
+            padding: 16px;
         }
+        .info-card-label {
+            display: flex; align-items: center; gap: 6px;
+            font: 700 10px 'DM Mono', monospace; letter-spacing: 1.2px;
+            color: var(--teal); margin-bottom: 10px;
+        }
+        .info-card-title { font-size: 1.05rem; font-weight: 700; margin-bottom: 14px; letter-spacing: -0.3px; }
 
+        .colorbar-row { display: flex; gap: 12px; align-items: center; }
         .colorbar-gradient {
-            width: 25px;
-            height: 100%;
-            background: linear-gradient(to top, #0000ff, #00ffff, #00ff00, #ffff00, #ff0000);
-            border-radius: 0.25rem;
+            width: 18px; height: 130px;
+            background: linear-gradient(to top, #1e3a8a, #0000ff, #00ffff, #00ff00, #ffff00, #ff4500, #ff0000);
+            border-radius: 999px;
+            box-shadow: inset 0 0 6px rgba(0,0,0,0.4);
         }
-
         .colorbar-labels {
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            height: 100%;
-            font-size: 0.75rem;
-            font-family: monospace;
+            display: flex; flex-direction: column; justify-content: space-between;
+            height: 130px; font-size: 0.72rem; font-family: 'DM Mono', monospace;
+            color: var(--muted);
         }
+        .colorbar-unit { font-size: 0.75rem; font-weight: 700; color: var(--ink); margin-bottom: 4px; text-align: right; }
 
-        .colorbar-layout {
-            display: flex;
-            gap: 0.5rem;
-            flex: 1; /* Allows the layout to take up remaining height */
+        .lock-btn {
+            width: 100%; margin-top: 14px;
+            background: rgba(255,255,255,0.05); color: var(--ink);
+            border: 1px solid var(--line); border-radius: 9px;
+            padding: 9px; font-size: 0.78rem; font-weight: 600;
+            cursor: pointer; transition: all 0.18s;
         }
+        .lock-btn:hover { border-color: rgba(34,211,197,0.4); color: var(--teal); }
+        .lock-btn.active { background: rgba(34,211,197,0.15); border-color: var(--teal); color: var(--teal); }
 
-        .map-timeline-overlay {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background-color: rgba(50, 52, 53, 0.85);
-            backdrop-filter: blur(4px);
-            padding: 1rem 1.5rem;
-            display: flex;
-            flex-direction: column;
-            gap: 0.75rem;
-            z-index: 1000;
-            border-top: 1px solid var(--border-color);
+        /* Bottom timeline bar */
+        .timeline-bar {
+            position: fixed;
+            left: 18px; bottom: 18px;
+            width: 460px;
+            max-width: calc(100vw - 36px);
+            z-index: 400;
+            padding: 10px 14px;
+            display: flex; flex-direction: column; gap: 6px;
         }
-
-        .timeline-controls {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-
+        .timeline-controls { display: flex; align-items: center; gap: 12px; }
         .btn-playback {
-            background-color: var(--accent-color);
-            color: white;
-            border: none;
-            padding: 0.5rem 1rem;
-            border-radius: 0.375rem;
-            font-weight: 500;
-            cursor: pointer;
-            min-width: 70px;
+            background: var(--teal); color: #06201d;
+            border: none; padding: 0.4rem 0.9rem;
+            border-radius: 7px; font-weight: 700; font-size: 0.76rem;
+            cursor: pointer; min-width: 60px; font-family: inherit;
+            box-shadow: 0 4px 14px rgba(34,211,197,0.3);
         }
-
-        .btn-playback:hover {
-            opacity: 0.9;
-        }
+        .btn-playback:hover { filter: brightness(1.08); }
+        .btn-playback:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
 
         .slider-timeline {
-            flex: 1;
-            -webkit-appearance: none;
-            appearance: none;
-            height: 6px;
-            border-radius: 3px;
-            background: var(--border-color);
-            outline: none;
-            cursor: pointer;
+            flex: 1; -webkit-appearance: none; appearance: none;
+            height: 5px; border-radius: 3px;
+            background: rgba(255,255,255,0.12); outline: none; cursor: pointer;
         }
-
         .slider-timeline::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 18px;
-            height: 18px;
-            border-radius: 50%;
-            background: var(--accent-color);
-            cursor: pointer;
+            -webkit-appearance: none; appearance: none;
+            width: 16px; height: 16px; border-radius: 50%;
+            background: var(--teal); cursor: pointer;
+            box-shadow: 0 0 0 4px rgba(34,211,197,0.2);
         }
+        .slider-timeline:disabled { opacity: 0.4; cursor: not-allowed; }
 
         .time-display {
-            font-family: monospace;
-            font-size: 0.95rem;
-            display: flex;
-            justify-content: flex-end;
-            color: #9ca3af;
+            font-family: 'DM Mono', monospace; font-size: 0.72rem;
+            display: flex; justify-content: flex-end; color: var(--muted);
         }
+        .ist-highlight { color: #4ade80; font-weight: 600; margin-left: 5px; }
 
-        .ist-highlight {
-            color: #34d399;
-            font-weight: bold;
-        }
-
+        /* Loading / no-data overlays */
         .loading-overlay {
-            position: absolute;
-            inset: 0;
-            background-color: rgba(17, 24, 39, 0.85);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 1.25rem;
-            z-index: 20;
+            position: fixed; inset: 0;
+            background: rgba(10, 15, 24, 0.75);
+            backdrop-filter: blur(3px);
+            display: flex; justify-content: center; align-items: center;
+            gap: 0.7rem;
+            font-size: 1rem; color: var(--muted);
+            z-index: 300;
         }
-        
+        .spinner {
+            width: 18px; height: 18px;
+            border: 2.5px solid var(--line);
+            border-top-color: var(--teal);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .no-data-overlay {
+            position: fixed; inset: 0;
+            background: rgba(10, 15, 24, 0.9);
+            backdrop-filter: blur(4px);
+            display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            gap: 0.85rem; z-index: 300; text-align: center; padding: 2rem;
+        }
+        .no-data-icon { font-size: 2.4rem; opacity: 0.9; }
+        .no-data-title { font-size: 1.15rem; font-weight: 700; }
+        .no-data-sub { font-size: 0.88rem; color: var(--muted); max-width: 400px; line-height: 1.5; }
+
         .hidden { display: none !important; }
+
+        ::-webkit-scrollbar { width: 7px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
+
+        @media (max-width: 820px) {
+            .layer-panel { width: calc(100vw - 36px); }
+            .info-card { display: none; }
+            .brand-copy small { display: none; }
+        }
     </style>
 </head>
 <body>
 
-    <main class="main-container">
-        <div class="sidebar-left">
-            <div class="sidebar-title">Weather Forecast</div>
-            <button class="var-btn active" data-var="temperature">Temperature (°C)</button>
-            <button class="var-btn" data-var="precipitation">Precipitation (mm)</button>
-            <button class="var-btn" data-var="wind_speed">Wind Speed (m/s)</button>
-            <button class="var-btn" data-var="specific_humidity">Specific Hum. (kg/kg)</button>
-            <button class="var-btn" data-var="specific_humidity">Coming soon</button>
-        </div>
+    <div id="map"></div>
 
-        <div class="map-wrapper">
-            <div id="loading" class="loading-overlay">Loading meteorological grid data...</div>
-            <div id="map"></div>
-            <div class="map-timeline-overlay">
-                <div class="timeline-controls">
-                    <button id="playBtn" class="btn-playback">Play</button>
-                    <input type="range" id="timelineSlider" class="slider-timeline" min="0" max="0" value="0">
-                </div>
-                <div class="time-display">
-                    <!-- <div>Frame: <span id="frameCounter">0/0</span></div> -->
-                    <!-- <div id="mapInfo" style="font-size: 0.85rem; color: #9ca3af; text-align: center; font-weight: normal;">Zoom: - | Extent: -</div> -->
-                    <div>Time (IST): <span id="timeStringIST" class="ist-highlight">--:--:--</span></div>
-                </div>
+    <div id="loading" class="loading-overlay hidden">
+        <div class="spinner"></div><span>Loading meteorological grid data...</span>
+    </div>
+    <div id="noData" class="no-data-overlay hidden">
+        <div class="no-data-icon">🛰️</div>
+        <div class="no-data-title">Forecast not available for this zone/year</div>
+        <div class="no-data-sub">WRF output has not been generated for this selection yet. Use "Run forecast" in the layer panel to queue a request, or pick another zone/year.</div>
+    </div>
+
+    <header class="topbar glass">
+        <div class="brand">
+            <div class="brand-mark">🌊</div>
+            <div class="brand-copy">
+                <strong>HydroClim Cast</strong>
+                <small>Regional Forecast Intelligence</small>
             </div>
         </div>
+        <div class="status-pill"><span class="status-dot"></span>Data connected</div>
+    </header>
 
-        <div class="colorbar-container">
-            <select id="locationSelect" class="city-select">
-                <option value="kharagpur_d03.json">Kharagpur</option>
-                <option value="kolkata_d03.json">Kolkata</option>
-            </select>
-            <span id="colorbarTitle" style="font-size: 0.8rem; font-weight: 500; text-align: center;">Unit</span>
-            <div class="colorbar-layout">
-                <div class="colorbar-gradient"></div>
-                <div class="colorbar-labels">
-                    <span id="valMax">0.0</span>
-                    <span id="valMid">0.0</span>
-                    <span id="valMin">0.0</span>
-                </div>
-            </div>
-            <button id="toggleFreezeBtn" class="var-btn" style="width: 100%; padding: 0.5rem; text-align: center;">Unlock Map</button>
+    <div id="layerPanel" class="layer-panel glass">
+        <div class="layer-panel-head" id="layerPanelToggle">
+            <span>⚙ FORECAST CONTROLS</span>
+            <span class="chevron">⌃</span>
         </div>
-    </main>
+        <div class="layer-panel-body">
+            <div class="field-block">
+                <label>DOMAIN / BASIN</label>
+                <select id="basinSelect" class="control-select"></select>
+            </div>
+            <div class="field-block">
+                <label>ZONE</label>
+                <select id="locationSelect" class="control-select"></select>
+            </div>
+            <div class="field-block">
+                <label>YEAR</label>
+                <select id="yearSelect" class="control-select"></select>
+                <button id="runForecastBtn" class="run-forecast-btn hidden">Run forecast for this zone</button>
+            </div>
+            <div class="field-block">
+                <label>FORECAST LAYER</label>
+                <div class="variable-grid" id="varButtons"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="info-card glass">
+        <div class="info-card-label"><span>◈</span><span>LIVE LAYER</span></div>
+        <div class="info-card-title" id="colorbarTitle">Unit</div>
+        <div class="colorbar-row">
+            <div class="colorbar-gradient"></div>
+            <div class="colorbar-labels">
+                <span id="valMax">0.0</span>
+                <span id="valMid">0.0</span>
+                <span id="valMin">0.0</span>
+            </div>
+        </div>
+        <button id="toggleFreezeBtn" class="lock-btn">Unlock Map</button>
+    </div>
+
+    <div class="timeline-bar glass">
+        <div class="timeline-controls">
+            <button id="playBtn" class="btn-playback">Play</button>
+            <input type="range" id="timelineSlider" class="slider-timeline" min="0" max="0" value="0">
+        </div>
+        <div class="time-display">Time (IST): <span id="timeStringIST" class="ist-highlight">--:--:--</span></div>
+    </div>
 
     <script>
         // ==========================================
-        // GEOSPATIAL MAP CONFIGURATION
+        // DATA CONFIGURATION
+        // Every basin/zone/year combo declared here. UI derives all
+        // dropdowns and availability from this object — add new WRF
+        // output by adding an entry, no other code changes needed.
+        //
+        // dataFile: null means "not generated yet" -> UI shows the
+        // no-data state with a Run Forecast stub button.
         // ==========================================
-        // Replace these placeholder boundaries with the actual Lat/Lon boundaries of your WRF domains.
-        // Format: [[South, West], [North, East]]
-        const locationConfig = {
-            "kharagpur_d03.json": { 
-                dataBounds: [[22.30247, 87.24], [22.35525, 87.35]],
-                viewBounds: [[22.29855, 87.25539], [22.35254, 87.34826]],
-                zoom: 14,
-                shapefile: "kharagpur.geojson"
+        const basins = {
+            "local_domains": {
+                label: "Local Domain (WRF d03)",
+                zones: {
+                    "kharagpur": {
+                        label: "Kharagpur",
+                        shapefile: "kharagpur.geojson",
+                        dataBounds: [[22.30247, 87.24], [22.35525, 87.35]],
+                        viewBounds: [[22.29855, 87.25539], [22.35254, 87.34826]],
+                        zoom: 14,
+                        years: {
+                            "2024": { dataFile: "kharagpur_d03.json" }
+                        }
+                    },
+                    "kolkata": {
+                        label: "Kolkata",
+                        shapefile: "kolkata.geojson",
+                        dataBounds: [[22.418, 88.1542], [22.7585, 88.56]],
+                        viewBounds: [[22.41865, 88.18005], [22.63429, 88.55152]],
+                        zoom: 12,
+                        years: {
+                            "2024": { dataFile: "kolkata_d03.json" }
+                        }
+                    }
+                }
             },
-            "kolkata_d03.json": { 
-                dataBounds: [[22.418, 88.1542], [22.7585, 88.56]],
-                viewBounds: [[22.41865, 88.18005], [22.63429, 88.55152]],
-                zoom: 12,
-                shapefile: "kolkata.geojson"
+            "ganga_basin": {
+                label: "Ganga Basin (JJAS)",
+                zones: {
+                    "full_basin": {
+                        label: "Full Ganga Basin",
+                        shapefile: null,
+                        dataBounds: [[21.360916, 73.429047], [31.412743, 88.418961]],
+                        viewBounds: [[20.5, 72.0], [32.2, 90.0]],
+                        zoom: 6,
+                        years: {
+                            "2024": { dataFile: "ganga_basin_jjas_2024.json" },
+                            "2025": { dataFile: "ganga_basin_jjas_2025.json" },
+                            "2026": { dataFile: null }
+                        }
+                    }
+                }
             }
         };
+
+        const variables = [
+            { key: "temperature", label: "Temperature", unit: "°C", decimals: 1 },
+            { key: "precipitation", label: "Precipitation", unit: "mm", decimals: 1 },
+            { key: "wind_speed", label: "Wind speed", unit: "m/s", decimals: 1 },
+            { key: "specific_humidity", label: "Humidity", unit: "kg/kg", decimals: 4 }
+        ];
 
         let currentDataset = null;
         let currentFrame = 0;
@@ -322,25 +471,100 @@
         let currentBounds = null;
         let currentVariable = 'temperature';
         let isMapFrozen = true;
+        let requestedForecasts = new Set(JSON.parse(localStorage.getItem('requestedForecasts') || '[]'));
 
+        // DOM Elements
+        const basinSelect = document.getElementById('basinSelect');
         const locationSelect = document.getElementById('locationSelect');
+        const yearSelect = document.getElementById('yearSelect');
+        const varButtonsContainer = document.getElementById('varButtons');
+        const runForecastBtn = document.getElementById('runForecastBtn');
         const playBtn = document.getElementById('playBtn');
         const slider = document.getElementById('timelineSlider');
-        // const frameCounter = document.getElementById('frameCounter');
         const timeStringIST = document.getElementById('timeStringIST');
-        // const mapInfo = document.getElementById('mapInfo');
         const loading = document.getElementById('loading');
-        
+        const noData = document.getElementById('noData');
         const valMaxLabel = document.getElementById('valMax');
         const valMidLabel = document.getElementById('valMid');
         const valMinLabel = document.getElementById('valMin');
         const colorbarTitle = document.getElementById('colorbarTitle');
         const toggleFreezeBtn = document.getElementById('toggleFreezeBtn');
+        const layerPanel = document.getElementById('layerPanel');
+        const layerPanelToggle = document.getElementById('layerPanelToggle');
+
+        function getCurrentZoneConfig() {
+            const basin = basins[basinSelect.value];
+            if (!basin) return null;
+            return basin.zones[locationSelect.value] || null;
+        }
+
+        function getCurrentYearConfig() {
+            const zone = getCurrentZoneConfig();
+            if (!zone) return null;
+            return zone.years[yearSelect.value] || null;
+        }
+
+        function forecastKey() {
+            return `${basinSelect.value}::${locationSelect.value}::${yearSelect.value}`;
+        }
+
+        function populateBasinSelect() {
+            basinSelect.innerHTML = '';
+            Object.entries(basins).forEach(([key, basin]) => {
+                const opt = document.createElement('option');
+                opt.value = key;
+                opt.textContent = basin.label;
+                basinSelect.appendChild(opt);
+            });
+        }
+
+        function populateLocationSelect() {
+            const basin = basins[basinSelect.value];
+            locationSelect.innerHTML = '';
+            if (!basin) return;
+            Object.entries(basin.zones).forEach(([key, zone]) => {
+                const opt = document.createElement('option');
+                opt.value = key;
+                opt.textContent = zone.label;
+                locationSelect.appendChild(opt);
+            });
+        }
+
+        function populateYearSelect() {
+            const zone = getCurrentZoneConfig();
+            yearSelect.innerHTML = '';
+            if (!zone) return;
+            Object.entries(zone.years).sort((a, b) => b[0] - a[0]).forEach(([year, cfg]) => {
+                const opt = document.createElement('option');
+                opt.value = year;
+                opt.textContent = cfg.dataFile ? year : `${year} (no data)`;
+                yearSelect.appendChild(opt);
+            });
+        }
+
+        function populateVarButtons() {
+            varButtonsContainer.innerHTML = '';
+            variables.forEach(v => {
+                const btn = document.createElement('button');
+                btn.className = 'var-btn' + (v.key === currentVariable ? ' active' : '');
+                btn.setAttribute('data-var', v.key);
+                btn.textContent = v.label;
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.variable-grid .var-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    currentVariable = v.key;
+                    if (currentDataset) {
+                        calculateGlobalBounds(currentVariable);
+                        renderFrame();
+                    }
+                });
+                varButtonsContainer.appendChild(btn);
+            });
+        }
 
         function getColorForValue(value, min, max) {
             let norm = (value - min) / (max - min || 1);
-            norm = Math.max(0, Math.min(1, norm)); 
-            
+            norm = Math.max(0, Math.min(1, norm));
             const r = Math.max(0, Math.min(255, Math.floor(255 * (rgbaLookup(norm, 0)))));
             const g = Math.max(0, Math.min(255, Math.floor(255 * (rgbaLookup(norm, 1)))));
             const b = Math.max(0, Math.min(255, Math.floor(255 * (rgbaLookup(norm, 2)))));
@@ -348,17 +572,17 @@
         }
 
         function rgbaLookup(n, colorIndex) {
-            if (colorIndex === 0) { 
+            if (colorIndex === 0) {
                 if (n < 0.4) return 0;
                 if (n < 0.7) return (n - 0.4) / 0.3;
                 return 1;
-            } else if (colorIndex === 1) { 
+            } else if (colorIndex === 1) {
                 if (n < 0.15) return 0;
                 if (n < 0.4) return (n - 0.15) / 0.25;
                 if (n < 0.75) return 1;
                 if (n < 0.9) return 1 - (n - 0.75) / 0.15;
                 return 0;
-            } else { 
+            } else {
                 if (n < 0.25) return 1;
                 if (n < 0.5) return 1 - (n - 0.25) / 0.25;
                 return 0;
@@ -366,8 +590,10 @@
         }
 
         function formatToIST(utcString) {
+            if (!utcString) return "--:--:--";
             const standardizedString = utcString.replace('_', 'T') + 'Z';
             const dateObj = new Date(standardizedString);
+            if (isNaN(dateObj.getTime())) return utcString;
             return dateObj.toLocaleString('en-US', {
                 timeZone: 'Asia/Kolkata',
                 year: 'numeric', month: 'short', day: '2-digit',
@@ -378,57 +604,53 @@
         function calculateGlobalBounds(variable) {
             let min = Infinity;
             let max = -Infinity;
-            
             currentDataset.timesteps.forEach(step => {
                 const dataArray = step.data[variable];
+                if (!dataArray) return;
                 for (let i = 0; i < dataArray.length; i++) {
                     const val = dataArray[i];
                     if (val < min) min = val;
                     if (val > max) max = val;
                 }
             });
+            globalMin = min === Infinity ? 0 : min;
+            globalMax = max === -Infinity ? 1 : max;
 
-            globalMin = min;
-            globalMax = max;
+            const varDef = variables.find(v => v.key === variable);
+            const decimals = varDef ? varDef.decimals : 1;
 
-            valMaxLabel.innerText = globalMax.toFixed(variable === 'specific_humidity' ? 4 : 1);
-            valMidLabel.innerText = ((globalMax + globalMin) / 2).toFixed(variable === 'specific_humidity' ? 4 : 1);
-            valMinLabel.innerText = globalMin.toFixed(variable === 'specific_humidity' ? 4 : 1);
-            
-            const units = { temperature: '°C', precipitation: 'mm', wind_speed: 'm/s', specific_humidity: 'kg/kg' };
-            colorbarTitle.innerText = units[variable] || '';
+            valMaxLabel.innerText = globalMax.toFixed(decimals);
+            valMidLabel.innerText = ((globalMax + globalMin) / 2).toFixed(decimals);
+            valMinLabel.innerText = globalMin.toFixed(decimals);
+
+            colorbarTitle.innerText = varDef ? `${varDef.label} (${varDef.unit})` : 'Value';
         }
 
         function renderFrame() {
             if (!currentDataset) return;
-            
             const baseWidth = currentDataset.metadata.grid_dimensions.width;
             const baseHeight = currentDataset.metadata.grid_dimensions.height;
             const activeVar = currentVariable;
-
             const frameData = currentDataset.timesteps[currentFrame];
             const dataArray = frameData.data[activeVar];
-            
-            // 1. Create an off-screen canvas to hold the 1:1 raw pixel data
+            if (!dataArray) return;
+
             const offscreenCanvas = document.createElement('canvas');
             offscreenCanvas.width = baseWidth;
             offscreenCanvas.height = baseHeight;
             const offCtx = offscreenCanvas.getContext('2d');
             const imgData = offCtx.createImageData(baseWidth, baseHeight);
-            
+
             for (let y = 0; y < baseHeight; y++) {
-                const flippedY = (baseHeight - 1) - y; 
+                const flippedY = (baseHeight - 1) - y;
                 for (let x = 0; x < baseWidth; x++) {
                     const arrayIdx = flippedY * baseWidth + x;
                     const val = dataArray[arrayIdx];
-                    
                     let norm = (val - globalMin) / (globalMax - globalMin || 1);
                     norm = Math.max(0, Math.min(1, norm));
-                    
                     const r = Math.max(0, Math.min(255, Math.floor(255 * (rgbaLookup(norm, 0)))));
                     const g = Math.max(0, Math.min(255, Math.floor(255 * (rgbaLookup(norm, 1)))));
                     const b = Math.max(0, Math.min(255, Math.floor(255 * (rgbaLookup(norm, 2)))));
-                    
                     const pixelIdx = (y * baseWidth + x) * 4;
                     imgData.data[pixelIdx] = r;
                     imgData.data[pixelIdx + 1] = g;
@@ -436,108 +658,130 @@
                     imgData.data[pixelIdx + 3] = 255;
                 }
             }
-            
-            // 2. Put raw 1:1 data into the off-screen canvas
-            offCtx.putImageData(imgData, 0, 0);
 
-            // 3. Convert off-screen canvas to a Data URL and update Leaflet Image Overlay
+            offCtx.putImageData(imgData, 0, 0);
             const dataUrl = offscreenCanvas.toDataURL();
             if (currentOverlay) {
                 currentOverlay.setUrl(dataUrl);
             } else if (currentBounds) {
-                currentOverlay = L.imageOverlay(dataUrl, currentBounds, { opacity: 0.65, interactive: false }).addTo(map);
+                currentOverlay = L.imageOverlay(dataUrl, currentBounds, { opacity: 0.55, interactive: false, className: 'data-overlay' }).addTo(map);
             }
 
             slider.value = currentFrame;
-            // frameCounter.innerText = `${currentFrame + 1} / ${currentDataset.metadata.total_timesteps}`;
             timeStringIST.innerText = formatToIST(frameData.time);
-        }
-
-        function updateMapInfo() {
-            if (!map) return;
-            const bounds = map.getBounds();
-            const zoom = map.getZoom();
-            const sw = bounds.getSouthWest();
-            const ne = bounds.getNorthEast();
-            // mapInfo.innerText = `Zoom: ${zoom} | Bounds: [[${sw.lat.toFixed(5)}, ${sw.lng.toFixed(5)}], [${ne.lat.toFixed(5)}, ${ne.lng.toFixed(5)}]]`;
         }
 
         function applyMapState() {
             if (!map) return;
-            const config = locationConfig[locationSelect.value];
-            if (!config) return;
-
-            const viewBoundsObj = L.latLngBounds(config.viewBounds);
+            const zone = getCurrentZoneConfig();
+            if (!zone) return;
+            const viewBoundsObj = L.latLngBounds(zone.viewBounds);
 
             if (isMapFrozen) {
                 map.setMinZoom(0);
                 map.setMaxZoom(18);
                 map.setMaxBounds(null);
-
-                map.setView(viewBoundsObj.getCenter(), config.zoom);
-                map.setMinZoom(config.zoom);
-                map.setMaxZoom(config.zoom);
+                map.setView(viewBoundsObj.getCenter(), zone.zoom);
+                map.setMinZoom(zone.zoom);
+                map.setMaxZoom(zone.zoom);
                 map.setMaxBounds(viewBoundsObj);
-                
+
                 map.dragging.disable();
                 map.touchZoom.disable();
                 map.doubleClickZoom.disable();
                 map.scrollWheelZoom.disable();
-                
+                map.boxZoom.disable();
+                map.keyboard.disable();
+
                 toggleFreezeBtn.innerText = "Unlock Map";
                 toggleFreezeBtn.classList.remove('active');
             } else {
                 map.setMinZoom(0);
                 map.setMaxZoom(18);
                 map.setMaxBounds(null);
-                
+
                 map.dragging.enable();
                 map.touchZoom.enable();
                 map.doubleClickZoom.enable();
                 map.scrollWheelZoom.enable();
-                
+                map.boxZoom.enable();
+                map.keyboard.enable();
+
                 toggleFreezeBtn.innerText = "Lock Map";
-                toggleFreezeBtn.classList.add('active'); // Visually highlight when unlocked
+                toggleFreezeBtn.classList.add('active');
             }
-            updateMapInfo();
         }
 
-        async function loadLocationData(jsonPath) {
+        function setControlsEnabled(enabled) {
+            playBtn.disabled = !enabled;
+            slider.disabled = !enabled;
+            document.querySelectorAll('.variable-grid .var-btn').forEach(b => b.disabled = !enabled);
+        }
+
+        function showNoDataState(show) {
+            noData.classList.toggle('hidden', !show);
+            setControlsEnabled(!show);
+            runForecastBtn.classList.toggle('hidden', !show);
+            if (show) {
+                const key = forecastKey();
+                if (requestedForecasts.has(key)) {
+                    runForecastBtn.textContent = 'Forecast requested — queued';
+                    runForecastBtn.classList.add('queued');
+                } else {
+                    runForecastBtn.textContent = 'Run forecast for this zone';
+                    runForecastBtn.classList.remove('queued');
+                }
+            }
+        }
+
+        async function loadCurrentSelection() {
+            const zone = getCurrentZoneConfig();
+            const yearCfg = getCurrentYearConfig();
+
+            if (isPlaying) togglePlayback();
+
+            if (currentOverlay && map) {
+                map.removeLayer(currentOverlay);
+                currentOverlay = null;
+            }
+            if (currentGeojsonLayer && map) {
+                map.removeLayer(currentGeojsonLayer);
+                currentGeojsonLayer = null;
+            }
+            currentDataset = null;
+
+            if (!zone) return;
+
+            currentBounds = zone.dataBounds;
+            applyMapState();
+
+            if (zone.shapefile) {
+                try {
+                    const res = await fetch(zone.shapefile);
+                    if (res.ok) {
+                        const data = await res.json();
+                        currentGeojsonLayer = L.geoJSON(data, {
+                            style: { color: '#22d3c5', weight: 2, fillOpacity: 0 }
+                        }).addTo(map);
+                    }
+                } catch (err) {
+                    console.warn("Failed to load shapefile overlay:", err);
+                }
+            }
+
+            if (!yearCfg || !yearCfg.dataFile) {
+                showNoDataState(true);
+                return;
+            }
+
+            showNoDataState(false);
             loading.classList.remove('hidden');
             try {
-                const config = locationConfig[jsonPath];
-                if (config && map) {
-                    currentBounds = config.dataBounds;
-                    applyMapState();
-
-                    if (currentGeojsonLayer) {
-                        map.removeLayer(currentGeojsonLayer);
-                        currentGeojsonLayer = null;
-                    }
-                    
-                    if (config.shapefile) {
-                        fetch(config.shapefile)
-                            .then(res => res.ok ? res.json() : null)
-                            .then(data => {
-                                if (data) {
-                                    currentGeojsonLayer = L.geoJSON(data, {
-                                        style: { color: '#000000', weight: 2, fillOpacity: 0 }
-                                    }).addTo(map);
-                                }
-                            })
-                            .catch(err => console.warn("Failed to load shapefile overlay:", err));
-                    }
-                }
-                if (currentOverlay && map) {
-                    map.removeLayer(currentOverlay);
-                    currentOverlay = null;
-                }
-
-                const response = await fetch(jsonPath);
+                const response = await fetch(yearCfg.dataFile);
                 if (!response.ok) throw new Error(`HTTP error status: ${response.status}`);
-                
+
                 currentDataset = await response.json();
-                
+
                 currentFrame = 0;
                 const totalFrames = currentDataset.metadata.total_timesteps;
                 slider.max = totalFrames - 1;
@@ -547,13 +791,14 @@
                 renderFrame();
             } catch (err) {
                 console.error("Error fetching or constructing the grid layout data:", err);
-                alert("Failed to load JSON file. Please verify it exists and is running on a local server environment.");
+                showNoDataState(true);
             } finally {
                 loading.classList.add('hidden');
             }
         }
 
         function togglePlayback() {
+            if (!currentDataset) return;
             if (isPlaying) {
                 clearInterval(animationInterval);
                 playBtn.innerText = "Play";
@@ -564,26 +809,23 @@
                 animationInterval = setInterval(() => {
                     currentFrame = (currentFrame + 1) % currentDataset.metadata.total_timesteps;
                     renderFrame();
-                }, 250); 
+                }, 250);
             }
         }
 
-        locationSelect.addEventListener('change', (e) => {
-            if (isPlaying) togglePlayback();
-            loadLocationData(e.target.value);
+        // Event Listeners
+        basinSelect.addEventListener('change', () => {
+            populateLocationSelect();
+            populateYearSelect();
+            loadCurrentSelection();
         });
 
-        document.querySelectorAll('.sidebar-left .var-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                document.querySelectorAll('.sidebar-left .var-btn').forEach(b => b.classList.remove('active'));
-                e.target.classList.add('active');
-                currentVariable = e.target.getAttribute('data-var');
-                if (currentDataset) {
-                    calculateGlobalBounds(currentVariable);
-                    renderFrame();
-                }
-            });
+        locationSelect.addEventListener('change', () => {
+            populateYearSelect();
+            loadCurrentSelection();
         });
+
+        yearSelect.addEventListener('change', loadCurrentSelection);
 
         slider.addEventListener('input', (e) => {
             if (isPlaying) togglePlayback();
@@ -598,24 +840,52 @@
             applyMapState();
         });
 
+        runForecastBtn.addEventListener('click', () => {
+            const key = forecastKey();
+            if (requestedForecasts.has(key)) return;
+            requestedForecasts.add(key);
+            localStorage.setItem('requestedForecasts', JSON.stringify([...requestedForecasts]));
+            runForecastBtn.textContent = 'Forecast requested — queued';
+            runForecastBtn.classList.add('queued');
+        });
+
+        layerPanelToggle.addEventListener('click', () => {
+            layerPanel.classList.toggle('collapsed');
+        });
+
+        function loadIndiaOutline() {
+            fetch('india-outline.geojson')
+                .then(res => res.ok ? res.json() : null)
+                .then(data => {
+                    if (!data) return;
+                    L.geoJSON(data, {
+                        style: { color: '#1e3a8a', weight: 1.6, opacity: 0.75, fillOpacity: 0 },
+                        interactive: false
+                    }).addTo(map);
+                })
+                .catch(err => console.warn("Failed to load India outline:", err));
+        }
+
+        // Initialization
         window.addEventListener('DOMContentLoaded', () => {
-            // Initialize Leaflet Map
             map = L.map('map', {
-                zoomSnap: 0.5,    // Allows the map to snap to half-zoom levels (e.g., 13.5)
-                zoomDelta: 0.5    // Clicking the +/- buttons will zoom by 0.5 increments
+                zoomControl: false
             }).setView([22.5, 87.5], 10);
-            
-            // Use OpenStreetMap as the open-source basemap
+
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 maxZoom: 18,
-                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                attribution: '&copy; OpenStreetMap'
             }).addTo(map);
 
-            // Update map details actively if map bounds or zoom level shift
-            map.on('moveend', updateMapInfo);
-            map.on('zoomend', updateMapInfo);
+            L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-            loadLocationData(locationSelect.value);
+            loadIndiaOutline();
+
+            populateBasinSelect();
+            populateLocationSelect();
+            populateYearSelect();
+            populateVarButtons();
+            loadCurrentSelection();
         });
     </script>
 </body>
