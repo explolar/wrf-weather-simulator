@@ -484,7 +484,16 @@
             .search-box { width: calc(100vw - 36px); }
             .layer-panel { width: calc(100vw - 36px); max-height: calc(100vh - 320px); }
             .layer-panel.collapsed { max-height: none; }
-            .info-card { display: none; }
+            /* The lock/unlock button is the only way to enable pan/zoom —
+               it must stay reachable even though the colorbar card it
+               normally lives in doesn't fit on a phone screen. Shrink the
+               card down to just that button instead of hiding it outright. */
+            .info-card {
+                top: auto; bottom: 80px; right: 18px;
+                width: auto; padding: 6px;
+            }
+            .info-card-label, .res-tag, .info-card-title, .colorbar-row { display: none; }
+            .lock-btn { width: auto; margin-top: 0; padding: 9px 16px; white-space: nowrap; }
             .brand-copy small { display: none; }
             .model-picker { width: calc(100vw - 36px); right: 18px; bottom: 96px; }
             .footer-credit { display: none; }
