@@ -172,17 +172,27 @@ def download_gfs(date_str, cycle, steps, out_dir: Path) -> Path:
             try:
                 ranges = _grib_idx_ranges(session, idx_url, GFS_FIELDS)
             except Exception as e:
-                abort(f"Failed to fetch/parse GFS index for {fhr}: {e}")
+                log(f"  {fhr}: index fetch failed after retries ({e}) — skipping this hour", "WARN")
+                continue
             if not ranges:
-                abort(f"No matching GRIB fields found for {fhr} "
-                      f"(run not published yet, or NOMADS index format changed).")
-            for start, end in ranges:
-                headers = {"Range": f"bytes={start}-{end}" if end is not None else f"bytes={start}-"}
-                r = _get_with_retry(session, file_url, timeout=60, headers=headers)
-                out_f.write(r.content)
+                log(f"  {fhr}: no matching GRIB fields found "
+                    f"(run not published yet, or NOMADS index format changed) — skipping this hour", "WARN")
+                continue
+            try:
+                for start, end in ranges:
+                    headers = {"Range": f"bytes={start}-{end}" if end is not None else f"bytes={start}-"}
+                    r = _get_with_retry(session, file_url, timeout=60, headers=headers)
+                    out_f.write(r.content)
+            except Exception as e:
+                log(f"  {fhr}: field download failed after retries ({e}) — skipping this hour", "WARN")
+                continue
             total_fields += len(ranges)
             log(f"  {fhr}: {len(ranges)} fields fetched", "OK")
             time.sleep(0.2)   # be a polite citizen of a free public server
+
+    if total_fields == 0:
+        abort("No GFS fields were successfully fetched for any step — NOMADS may be down "
+              "or the requested run isn't published yet.")
 
     size_mb = out_path.stat().st_size / 1_048_576
     log(f"Downloaded: {out_path.name}  ({size_mb:.1f} MB, {total_fields} GRIB messages)", "OK")
