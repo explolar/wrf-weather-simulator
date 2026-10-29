@@ -105,7 +105,15 @@
             align-items: center;
             pointer-events: none;
         }
-        .brand { display: flex; align-items: center; gap: 9px; min-width: 0; overflow: hidden; }
+        .brand {
+            display: flex; align-items: center; gap: 9px; min-width: 0;
+            background: var(--panel-bg);
+            backdrop-filter: blur(14px) saturate(140%);
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            padding: 5px 14px 5px 5px;
+            pointer-events: auto;
+        }
         .brand-mark {
             width: 32px; height: 32px;
             border-radius: 50%;
