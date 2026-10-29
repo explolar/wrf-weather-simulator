@@ -72,4 +72,24 @@ jobs:
           git add ecmwf_ifs_*.json ecmwf_aifs_*.json gfs_*.json icon_*.json index.html
           git diff --cached --quiet && echo "No forecast changes to commit." && exit 0
           git commit -m "data: automated forecast update ($(date -u +%Y-%m-%d) ${{ inputs.cycle || '00' }}Z, IFS/AIFS/GFS/ICON)"
-          git push
+
+          # The checkout is taken at job start but this job can run 20-30+ min
+          # (ICON alone is ~600 small downloads) — if main moved in the
+          # meantime (e.g. a manual push), a plain `git push` 404/non-fast-
+          # forward-rejects and the whole run's output is lost since the
+          # runner is ephemeral. Rebase onto the latest main and retry.
+          for i in 1 2 3 4 5; do
+            if git push; then
+              echo "Pushed successfully."
+              exit 0
+            fi
+            echo "Push rejected (attempt $i/5) — fetching + rebasing onto latest origin/main ..."
+            git fetch origin main
+            if ! git rebase origin/main; then
+              echo "Rebase conflict — aborting rebase, will retry next attempt."
+              git rebase --abort
+            fi
+            sleep $((5 * i))
+          done
+          echo "Failed to push after retries."
+          exit 1
