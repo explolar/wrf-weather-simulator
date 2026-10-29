@@ -83,6 +83,14 @@ GRIB_MAP = {
     # GFS sdswrf is already an interval-average W/m^2 flux, used as-is.
     "ssrd":   "_solar_accum",
     "sdswrf": "solar_radiation",
+
+    # DWD ICON (shortNames not covered by the generic WMO table above;
+    # eccodes keeps DWD's own param names as the "shortName" for these).
+    "2r":        "_relhum2m",   # 2m relative humidity %, -> specific_humidity via T+RH
+    "CLCT":      "cloud_cover", # already %
+    "CAPE_ML":   "cape",
+    "ASWDIR_S":  "_solar_dir",  # direct + diffuse downward shortwave, both already
+    "ASWDIFD_S": "_solar_diff", # interval-average W/m^2 -> summed into solar_radiation
 }
 
 # NetCDF variable name candidates → our key
@@ -139,6 +147,20 @@ def _dewpoint_to_q(td_k, p_pa=101325.0):
     e_s  = 6.1078 * np.exp(17.2694 * td_c / (td_c + 237.29))  # hPa
     e_s_pa = e_s * 100.0
     q = 0.622 * e_s_pa / (p_pa - 0.378 * e_s_pa)
+    return np.clip(q, 0, None)
+
+
+def _rh_to_q(rh_pct, temp_c, p_pa=101325.0):
+    """
+    Convert 2-m relative humidity (%) + temperature (°C) to specific
+    humidity (kg/kg) via the same Magnus formula, using actual (not
+    dewpoint) temperature for saturation vapour pressure.
+    """
+    import numpy as np
+    e_s = 6.1078 * np.exp(17.2694 * temp_c / (temp_c + 237.29))  # hPa
+    e = (rh_pct / 100.0) * e_s
+    e_pa = e * 100.0
+    q = 0.622 * e_pa / (p_pa - 0.378 * e_pa)
     return np.clip(q, 0, None)
 
 
@@ -340,6 +362,10 @@ def _finalise(raw, lat, lon, time_strs, bbox, max_steps, precip_unit="m",
     if "specific_humidity" not in raw and "_dewpoint" in raw:
         raw["specific_humidity"] = _dewpoint_to_q(raw["_dewpoint"])
 
+    if "specific_humidity" not in raw and "_relhum2m" in raw and "temperature" in raw:
+        # raw["temperature"] is already Celsius at this point (converted above)
+        raw["specific_humidity"] = _rh_to_q(raw["_relhum2m"], raw["temperature"])
+
     if "pressure" in raw:
         raw["pressure"] = _pressure_pa_to_hpa(raw["pressure"])
 
@@ -348,6 +374,9 @@ def _finalise(raw, lat, lon, time_strs, bbox, max_steps, precip_unit="m",
 
     if "_solar_accum" in raw:
         raw["solar_radiation"] = _solar_accum_to_wm2(raw["_solar_accum"], time_strs)
+
+    if "solar_radiation" not in raw and "_solar_dir" in raw and "_solar_diff" in raw:
+        raw["solar_radiation"] = raw["_solar_dir"] + raw["_solar_diff"]
 
     # ── Build output ──────────────────────────────────────────────────────────
     keys_out = [k for k in ["temperature", "precipitation", "wind_speed", "specific_humidity",

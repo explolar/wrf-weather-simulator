@@ -1,4 +1,4 @@
-name: Daily forecast update (ECMWF IFS, ECMWF AIFS, NOAA GFS)
+name: Daily forecast update (ECMWF IFS, ECMWF AIFS, NOAA GFS, DWD ICON)
 
 on:
   schedule:
@@ -57,11 +57,18 @@ jobs:
           --cycle ${{ inputs.cycle || '00' }}
           --zone all --no-git
 
+      - name: Run DWD ICON pipeline (all zones)
+        continue-on-error: true   # newest/most complex integration (icosahedral remap) — isolate failures
+        run: >
+          python icon_pipeline.py
+          --cycle ${{ inputs.cycle || '00' }}
+          --zone all --no-git
+
       - name: Commit and push updated forecasts
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add ecmwf_ifs_*.json ecmwf_aifs_*.json gfs_*.json index.html
+          git add ecmwf_ifs_*.json ecmwf_aifs_*.json gfs_*.json icon_*.json index.html
           git diff --cached --quiet && echo "No forecast changes to commit." && exit 0
-          git commit -m "data: automated forecast update ($(date -u +%Y-%m-%d) ${{ inputs.cycle || '00' }}Z, IFS/AIFS/GFS)"
+          git commit -m "data: automated forecast update ($(date -u +%Y-%m-%d) ${{ inputs.cycle || '00' }}Z, IFS/AIFS/GFS/ICON)"
           git push

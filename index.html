@@ -259,6 +259,7 @@
         .source-badge.wrf   { background: rgba(34,211,197,0.10); color: var(--teal); border: 1px solid rgba(34,211,197,0.25); }
         .source-badge.ecmwf { background: rgba(99,102,241,0.12); color: #a5b4fc;   border: 1px solid rgba(99,102,241,0.30); }
         .source-badge.gfs   { background: rgba(96,165,250,0.12); color: #93c5fd;   border: 1px solid rgba(96,165,250,0.30); }
+        .source-badge.icon  { background: rgba(251,146,60,0.12); color: #fdba74;   border: 1px solid rgba(251,146,60,0.30); }
 
         /* Resolution tag inside info-card */
         .res-tag { font: 600 9px 'DM Mono', monospace; letter-spacing: 1px; color: var(--muted); margin-bottom: 4px; }
@@ -814,6 +815,63 @@
                         }
                     }
                 }
+            },
+
+            // ---------------------------------------------------------------
+            // DWD ICON Forecast  (global, icosahedral native grid ~13km,
+            // remapped to 0.25° regular lat/lon — free, no auth)
+            //   Usage  : python icon_pipeline.py --zone all
+            // ---------------------------------------------------------------
+            "icon": {
+                label: "DWD ICON Forecast",
+                source: "icon",
+                nativeResKm: 13,
+                zones: {
+                    "india_subcontinent": {
+                        label: "India Subcontinent (full domain)",
+                        shapefile: "india-outline.geojson",
+                        dataBounds: [[7.0, 67.0], [38.0, 98.0]],
+                        viewBounds: [[6.0, 65.0], [38.0, 100.0]],
+                        zoom: 5,
+                        resolutionKm: 28,
+                        years: {
+                            "operational": { dataFile: null, label: "Operational run (not yet loaded)" }
+                        }
+                    },
+                    "west_india": {
+                        label: "Western India",
+                        shapefile: "india-outline.geojson",
+                        dataBounds: [[8.0, 67.0], [30.0, 78.0]],
+                        viewBounds: [[7.0, 65.0], [32.0, 80.0]],
+                        zoom: 5,
+                        resolutionKm: 28,
+                        years: {
+                            "operational": { dataFile: null, label: "Operational run (not yet loaded)" }
+                        }
+                    },
+                    "east_india": {
+                        label: "Eastern India & Bay of Bengal",
+                        shapefile: "india-outline.geojson",
+                        dataBounds: [[8.0, 80.0], [27.0, 97.0]],
+                        viewBounds: [[7.0, 79.0], [28.0, 99.0]],
+                        zoom: 5,
+                        resolutionKm: 28,
+                        years: {
+                            "operational": { dataFile: null, label: "Operational run (not yet loaded)" }
+                        }
+                    },
+                    "north_india": {
+                        label: "Northern India & Himalayan Foothills",
+                        shapefile: "india-outline.geojson",
+                        dataBounds: [[27.0, 70.0], [36.0, 95.0]],
+                        viewBounds: [[26.0, 68.0], [37.0, 97.0]],
+                        zoom: 5,
+                        resolutionKm: 28,
+                        years: {
+                            "operational": { dataFile: null, label: "Operational run (not yet loaded)" }
+                        }
+                    }
+                }
             }
         };
 
@@ -937,7 +995,7 @@
             if (!basin || !badge) return;
             const src = basin.source || 'wrf';
             badge.className = 'source-badge hidden ' + src;
-            if (src === 'ecmwf' || src === 'gfs') {
+            if (src === 'ecmwf' || src === 'gfs' || src === 'icon') {
                 badge.innerHTML = `&#127760; ${basin.label}`;
             } else {
                 badge.innerHTML = '\uD83D\uDCBB WRF Simulation Output';

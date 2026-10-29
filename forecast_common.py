@@ -98,11 +98,20 @@ def patch_index_html(basin_key: str, json_filename: str, run_key: str,
         f'                            }},\n'
     )
 
-    basin_start = content.find(f'"{basin_key}"')
+    # Anchor the search inside the `basins` JS object and require the
+    # key:{ shape, not a bare quoted substring — a bare f'"{basin_key}"'
+    # search can false-match unrelated things elsewhere in the file (e.g.
+    # basin_key="icon" matching the <link rel="icon"> favicon tag in <head>,
+    # which happened in practice and silently patched the wrong basin).
+    basins_decl = content.find('const basins = {')
+    if basins_decl == -1:
+        abort("Could not find 'const basins = {' in index.html.")
+
+    basin_start = content.find(f'"{basin_key}": {{', basins_decl)
     if basin_start == -1:
         abort(f"'{basin_key}' basin not found in index.html.")
 
-    zone_pos = content.find(f'"{zone}"', basin_start)
+    zone_pos = content.find(f'"{zone}": {{', basin_start)
     if zone_pos == -1:
         abort(f"Zone '{zone}' not found inside '{basin_key}'.")
 

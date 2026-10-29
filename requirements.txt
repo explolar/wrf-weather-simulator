@@ -4,3 +4,4 @@ eccodes
 netCDF4
 numpy
 requests
+scipy
