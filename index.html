@@ -498,12 +498,9 @@
         <div class="layer-panel-body">
             <select id="basinSelect" class="control-select hidden"></select>
             <select id="locationSelect" class="control-select hidden"></select>
-            <div class="field-block">
-                <label>YEAR</label>
-                <select id="yearSelect" class="control-select"></select>
-                <button id="runForecastBtn" class="run-forecast-btn hidden">Run forecast for this zone</button>
-                <div id="sourceBadge" class="source-badge wrf">💻 WRF Simulation Output</div>
-            </div>
+            <select id="yearSelect" class="control-select hidden"></select>
+            <button id="runForecastBtn" class="run-forecast-btn hidden">Run forecast for this zone</button>
+            <div id="sourceBadge" class="source-badge wrf hidden">💻 WRF Simulation Output</div>
             <div class="field-block">
                 <label>FORECAST LAYER</label>
                 <div class="variable-grid" id="varButtons"></div>
@@ -912,7 +909,7 @@
             const resTagEl = document.getElementById('resTag');
             if (!basin || !badge) return;
             const src = basin.source || 'wrf';
-            badge.className = 'source-badge ' + src;
+            badge.className = 'source-badge hidden ' + src;
             if (src === 'ecmwf' || src === 'gfs') {
                 badge.innerHTML = `&#127760; ${basin.label}`;
             } else {
@@ -1168,7 +1165,6 @@
         function showNoDataState(show) {
             noData.classList.toggle('hidden', !show);
             setControlsEnabled(!show);
-            runForecastBtn.classList.toggle('hidden', !show);
             if (show) {
                 const key = forecastKey();
                 if (requestedForecasts.has(key)) {
