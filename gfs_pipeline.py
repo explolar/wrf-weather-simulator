@@ -23,7 +23,9 @@ Fields (GRIB2 shortNames, already in ecmwf_to_json.py's GRIB_MAP):
 
 f000 is skipped: GFS has no APCP message at init (zero accumulation), and
 including it would misalign the precipitation time series against the
-other fields. Steps start at f003.
+other fields. Steps start at f001 — GFS 0.25deg publishes hourly through
+f120, so the default is 1-hourly out to 72h (vs ECMWF IFS's 3-hourly and
+AIFS's 6-hourly, which is the finest their open-data actually publishes).
 
 Usage
 -----
@@ -35,7 +37,7 @@ Usage
 """
 
 import argparse
-import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -49,7 +51,7 @@ GFS_BASE = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod"
 BASIN_KEY = "gfs"
 
 # Skip f000 — no APCP message at init, would misalign the precip series.
-DEFAULT_STEPS = list(range(3, 73, 3))   # 3 h ... 72 h, 24 files
+DEFAULT_STEPS = list(range(1, 73, 1))   # 1 h ... 72 h, 72 files (hourly)
 
 # (GRIB2 param, level, optional extra filter on the idx description).
 # APCP has two idx entries per hour beyond f003 — a cumulative "0-N hour
@@ -65,13 +67,30 @@ GFS_FIELDS = [
 ]
 
 
+def _get_with_retry(session, url, attempts=4, backoff=2.0, **kwargs):
+    """GET with retries — NOMADS throttles/truncates under rapid-fire requests
+    (seen in practice around the ~40th request of a hourly-step run)."""
+    last_err = None
+    for attempt in range(attempts):
+        try:
+            r = session.get(url, timeout=kwargs.pop("timeout", 20), **kwargs)
+            r.raise_for_status()
+            return r
+        except Exception as e:
+            last_err = e
+            if attempt < attempts - 1:
+                time.sleep(backoff * (attempt + 1))
+    raise last_err
+
+
 def _grib_idx_ranges(session, idx_url, field_specs):
-    r = session.get(idx_url, timeout=20)
-    r.raise_for_status()
+    r = _get_with_retry(session, idx_url)
     lines = [l for l in r.text.strip().splitlines() if l]
     entries = []
     for line in lines:
         parts = line.split(":")
+        if len(parts) < 4:
+            continue   # malformed/truncated line (transient NOMADS hiccup) — skip it
         offset = int(parts[1])
         desc = ":".join(parts[3:])   # "PARAM:LEVEL:FCST_DESC:"
         entries.append((offset, desc))
@@ -123,11 +142,11 @@ def download_gfs(date_str, cycle, steps, out_dir: Path) -> Path:
                       f"(run not published yet, or NOMADS index format changed).")
             for start, end in ranges:
                 headers = {"Range": f"bytes={start}-{end}" if end is not None else f"bytes={start}-"}
-                r = session.get(file_url, headers=headers, timeout=60)
-                r.raise_for_status()
+                r = _get_with_retry(session, file_url, timeout=60, headers=headers)
                 out_f.write(r.content)
             total_fields += len(ranges)
             log(f"  {fhr}: {len(ranges)} fields fetched", "OK")
+            time.sleep(0.2)   # be a polite citizen of a free public server
 
     size_mb = out_path.stat().st_size / 1_048_576
     log(f"Downloaded: {out_path.name}  ({size_mb:.1f} MB, {total_fields} GRIB messages)", "OK")
@@ -150,8 +169,8 @@ def main():
     ap.add_argument("--bbox",       nargs=4, type=float,
                     metavar=("W", "S", "E", "N"), default=None,
                     help="Bounding box W S E N (default: zone's known bbox). Ignored with --zone all.")
-    ap.add_argument("--max-steps",  type=int, default=24,
-                    help="Max timesteps in output JSON (default: 24 = 72h from f003)")
+    ap.add_argument("--max-steps",  type=int, default=72,
+                    help="Max timesteps in output JSON (default: 72 = hourly f001-f072)")
     ap.add_argument("--local-file", default=None,
                     help="Skip download; convert this local GRIB2 file")
     ap.add_argument("--no-git",     action="store_true",

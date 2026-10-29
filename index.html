@@ -408,8 +408,12 @@
             text-align: center;
             font: 600 10px 'DM Mono', monospace;
             letter-spacing: 0.4px;
-            color: var(--muted);
-            text-shadow: 0 1px 4px rgba(0,0,0,0.6);
+            color: var(--ink);
+            background: var(--panel-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            padding: 4px 12px;
         }
 
         /* Loading / no-data overlays */
@@ -578,10 +582,6 @@
                         zoom: 5,
                         resolutionKm: 28,
                         years: {
-                            "2026-placeholder": {
-                                dataFile: "ecmwf_ifs_india_placeholder.json",
-                                label: "2026 Demo (placeholder grid)"
-                            },
                             "20261029_00Z": {
                                 dataFile: "ecmwf_ifs_india_subcontinent_20261029_00Z.json",
                                 label: "2026-10-29 00Z (ECMWF IFS open-data)"
