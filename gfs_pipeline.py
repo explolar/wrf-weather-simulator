@@ -59,11 +59,18 @@ DEFAULT_STEPS = list(range(1, 73, 1))   # 1 h ... 72 h, 72 files (hourly)
 # cumulative one (matches ECMWF tp's semantics: diffed across steps to
 # get per-interval mm), so keep only entries whose window starts at 0.
 GFS_FIELDS = [
-    ("TMP",  "2 m above ground",  None),
-    ("UGRD", "10 m above ground", None),
-    ("VGRD", "10 m above ground", None),
-    ("SPFH", "2 m above ground",  None),
-    ("APCP", "surface",           lambda desc: desc.split(":")[2].startswith("0-")),
+    ("TMP",   "2 m above ground",  None),
+    ("UGRD",  "10 m above ground", None),
+    ("VGRD",  "10 m above ground", None),
+    ("SPFH",  "2 m above ground",  None),
+    ("APCP",  "surface",           lambda desc: desc.split(":")[2].startswith("0-")),
+    ("PRMSL", "mean sea level",    None),
+    ("CAPE",  "surface",           None),
+    ("CIN",   "surface",           None),
+    # "TCDC:entire atmosphere" has both an instantaneous and a running-average
+    # idx entry sharing the same prefix — keep the instantaneous one.
+    ("TCDC",  "entire atmosphere", lambda desc: "ave" not in desc.lower()),
+    ("DSWRF", "surface",           lambda desc: "ave" in desc.lower()),
 ]
 
 

@@ -50,7 +50,8 @@ def abort(msg):
 # ──────────────────────────────────────────────────────────────────────────────
 
 def convert_to_json(src_path: Path, json_path: Path, bbox, max_steps: int,
-                     source_tag: str, model_tag: str, precip_unit: str = "m") -> Path:
+                     source_tag: str, model_tag: str, precip_unit: str = "m",
+                     cloud_unit: str = "percent") -> Path:
     log(f"Converting {src_path.name} -> {json_path.name} ...", "STEP")
 
     if not CONVERTER.exists():
@@ -61,7 +62,8 @@ def convert_to_json(src_path: Path, json_path: Path, bbox, max_steps: int,
            "--output", str(json_path),
            "--source-tag", source_tag,
            "--model-tag",  model_tag,
-           "--precip-unit", precip_unit]
+           "--precip-unit", precip_unit,
+           "--cloud-unit", cloud_unit]
     if bbox:
         cmd += ["--bbox"] + [str(v) for v in bbox]
     if max_steps:
@@ -90,7 +92,7 @@ def patch_index_html(basin_key: str, json_filename: str, run_key: str,
     content = INDEX_HTML.read_text(encoding="utf-8")
 
     new_entry = (
-        f'                            "{run_key}": {{\n'
+        f'\n                            "{run_key}": {{\n'
         f'                                dataFile: "{json_filename}",\n'
         f'                                label: "{run_label}"\n'
         f'                            }},\n'
@@ -139,7 +141,7 @@ def patch_index_html(basin_key: str, json_filename: str, run_key: str,
             abort(f"Could not locate existing '{run_key}' entry to replace in zone '{zone}'.")
         content = content[:years_open] + years_block + content[years_close:]
     else:
-        content = content[:years_open] + "\n" + new_entry + content[years_open:]
+        content = content[:years_open] + new_entry + content[years_open:]
 
     INDEX_HTML.write_text(content, encoding="utf-8")
     log(f"  Added '{run_key}' to zone '{zone}' of '{basin_key}' in index.html", "OK")

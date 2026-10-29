@@ -71,6 +71,18 @@ GRIB_MAP = {
     "q":    "specific_humidity",
     "sh":   "specific_humidity",
     "2sh":  "specific_humidity",
+    # Pressure, Pa in both sources -> hPa (see _finalise)
+    "msl":    "pressure",     # ECMWF
+    "prmsl":  "pressure",     # GFS
+    # Cloud cover: ECMWF tcc is a 0-1 fraction, GFS tcc is already % (see --cloud-unit)
+    "tcc":    "cloud_cover",
+    # CAPE/CIN: GFS only — not published in ECMWF open-data
+    "cape":   "cape",
+    "cin":    "cin",
+    # Solar: ECMWF ssrd is accumulated J/m^2 (diffed -> W/m^2, see _finalise);
+    # GFS sdswrf is already an interval-average W/m^2 flux, used as-is.
+    "ssrd":   "_solar_accum",
+    "sdswrf": "solar_radiation",
 }
 
 # NetCDF variable name candidates → our key
@@ -137,6 +149,34 @@ def _flip_ns(arr_2d, lat):
     return arr_2d
 
 
+def _pressure_pa_to_hpa(arr_3d):
+    return arr_3d / 100.0
+
+
+def _cloud_cover_to_pct(arr_3d, unit="percent"):
+    """ECMWF tcc is a 0-1 fraction ("fraction"); GFS tcc is already 0-100 ("percent")."""
+    return arr_3d * 100.0 if unit == "fraction" else arr_3d
+
+
+def _solar_accum_to_wm2(arr_3d, time_strs):
+    """
+    Accumulated solar radiation (J/m^2, since forecast start) -> per-interval
+    average flux (W/m^2). Interval length is derived from consecutive
+    timestep labels so it works for any step cadence (3h IFS, 6h AIFS, ...).
+    arr_3d shape: (T, H, W).
+    """
+    import numpy as np
+    diff = np.diff(arr_3d, axis=0, prepend=arr_3d[[0]])
+    diff[diff < 0] = 0.0
+    if len(time_strs) >= 2:
+        t0 = datetime.strptime(time_strs[0], "%Y-%m-%d_%H:%M:%S")
+        t1 = datetime.strptime(time_strs[1], "%Y-%m-%d_%H:%M:%S")
+        interval_s = max((t1 - t0).total_seconds(), 1.0)
+    else:
+        interval_s = 3 * 3600.0
+    return diff / interval_s
+
+
 def _build_metadata(lon, lat, n_steps, source="ECMWF_IFS", model="IFS"):
     lats = sorted([float(lat[0]), float(lat[-1])])
     return {
@@ -155,7 +195,7 @@ def _build_metadata(lon, lat, n_steps, source="ECMWF_IFS", model="IFS"):
 # ──────────────────────────────────────────────────────────────────────────────
 
 def read_grib2(path: Path, bbox=None, max_steps=None, precip_unit="m",
-               source_tag="ECMWF_IFS", model_tag="IFS"):
+               source_tag="ECMWF_IFS", model_tag="IFS", cloud_unit="percent"):
     try:
         import cfgrib
         import numpy as np
@@ -205,7 +245,7 @@ def read_grib2(path: Path, bbox=None, max_steps=None, precip_unit="m",
         sys.exit("ERROR: could not extract lat/lon from GRIB2 file.")
 
     return _finalise(raw, lat, lon, time_strs, bbox, max_steps,
-                      precip_unit, source_tag, model_tag)
+                      precip_unit, source_tag, model_tag, cloud_unit)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -213,7 +253,7 @@ def read_grib2(path: Path, bbox=None, max_steps=None, precip_unit="m",
 # ──────────────────────────────────────────────────────────────────────────────
 
 def read_netcdf(path: Path, bbox=None, max_steps=None, precip_unit="m",
-                 source_tag="ECMWF_IFS", model_tag="IFS"):
+                 source_tag="ECMWF_IFS", model_tag="IFS", cloud_unit="percent"):
     try:
         import netCDF4 as nc4
         import numpy as np
@@ -259,7 +299,7 @@ def read_netcdf(path: Path, bbox=None, max_steps=None, precip_unit="m",
                 break
     nc.close()
     return _finalise(raw, lat, lon, time_strs, bbox, max_steps,
-                      precip_unit, source_tag, model_tag)
+                      precip_unit, source_tag, model_tag, cloud_unit)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -267,7 +307,7 @@ def read_netcdf(path: Path, bbox=None, max_steps=None, precip_unit="m",
 # ──────────────────────────────────────────────────────────────────────────────
 
 def _finalise(raw, lat, lon, time_strs, bbox, max_steps, precip_unit="m",
-              source_tag="ECMWF_IFS", model_tag="IFS"):
+              source_tag="ECMWF_IFS", model_tag="IFS", cloud_unit="percent"):
     import numpy as np
 
     # ── Bounding-box crop ─────────────────────────────────────────────────────
@@ -300,8 +340,18 @@ def _finalise(raw, lat, lon, time_strs, bbox, max_steps, precip_unit="m",
     if "specific_humidity" not in raw and "_dewpoint" in raw:
         raw["specific_humidity"] = _dewpoint_to_q(raw["_dewpoint"])
 
+    if "pressure" in raw:
+        raw["pressure"] = _pressure_pa_to_hpa(raw["pressure"])
+
+    if "cloud_cover" in raw:
+        raw["cloud_cover"] = _cloud_cover_to_pct(raw["cloud_cover"], cloud_unit)
+
+    if "_solar_accum" in raw:
+        raw["solar_radiation"] = _solar_accum_to_wm2(raw["_solar_accum"], time_strs)
+
     # ── Build output ──────────────────────────────────────────────────────────
-    keys_out = [k for k in ["temperature", "precipitation", "wind_speed", "specific_humidity"]
+    keys_out = [k for k in ["temperature", "precipitation", "wind_speed", "specific_humidity",
+                             "pressure", "cloud_cover", "cape", "cin", "solar_radiation"]
                 if k in raw]
     print(f"[ecmwf_to_json]  Grid : {len(lon)}x{len(lat)}   Steps: {n_steps}   Vars: {keys_out}")
 
@@ -340,6 +390,9 @@ def main():
     ap.add_argument("--precip-unit", choices=["m", "mm"], default="m",
                     help="Input precipitation unit before conversion to mm "
                          "(ECMWF tp: metres: 'm' [default]; GFS/ICON APCP: already mm: 'mm')")
+    ap.add_argument("--cloud-unit", choices=["fraction", "percent"], default="percent",
+                    help="Input cloud cover unit before conversion to %% "
+                         "(ECMWF tcc: 0-1 fraction: 'fraction'; GFS TCDC: already %%: 'percent' [default])")
     args = ap.parse_args()
 
     src = Path(args.input)
@@ -351,7 +404,7 @@ def main():
     is_grib = src.suffix.lower() in (".grb", ".grb2", ".grib", ".grib2")
     reader = read_grib2 if is_grib else read_netcdf
     metadata, timesteps = reader(src, args.bbox, args.max_steps,
-                                  args.precip_unit, args.source_tag, args.model_tag)
+                                  args.precip_unit, args.source_tag, args.model_tag, args.cloud_unit)
 
     payload = {"metadata": metadata, "timesteps": timesteps}
     with open(out, "w") as f:

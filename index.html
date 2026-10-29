@@ -821,7 +821,12 @@
             { key: "temperature", label: "Temperature", unit: "°C", decimals: 1 },
             { key: "precipitation", label: "Precipitation", unit: "mm", decimals: 1 },
             { key: "wind_speed", label: "Wind speed", unit: "m/s", decimals: 1 },
-            { key: "specific_humidity", label: "Humidity", unit: "kg/kg", decimals: 4 }
+            { key: "specific_humidity", label: "Humidity", unit: "kg/kg", decimals: 4 },
+            { key: "pressure", label: "Pressure", unit: "hPa", decimals: 1 },
+            { key: "cloud_cover", label: "Cloud cover", unit: "%", decimals: 0 },
+            { key: "cape", label: "CAPE", unit: "J/kg", decimals: 0 },
+            { key: "cin", label: "CIN", unit: "J/kg", decimals: 0 },
+            { key: "solar_radiation", label: "Solar radiation", unit: "W/m²", decimals: 0 }
         ];
 
         let currentDataset = null;
@@ -986,6 +991,12 @@
                     }
                 });
                 varButtonsContainer.appendChild(btn);
+            });
+        }
+
+        function updateVarButtonAvailability(available) {
+            document.querySelectorAll('.variable-grid .var-btn').forEach(b => {
+                b.disabled = !available.includes(b.dataset.var);
             });
         }
 
@@ -1252,6 +1263,15 @@
                 const totalFrames = currentDataset.metadata.total_timesteps;
                 slider.max = totalFrames - 1;
                 slider.value = 0;
+
+                const available = currentDataset.metadata.variables_present || [];
+                if (!available.includes(currentVariable)) {
+                    currentVariable = available.includes('temperature') ? 'temperature' : available[0];
+                    document.querySelectorAll('.variable-grid .var-btn').forEach(b => {
+                        b.classList.toggle('active', b.dataset.var === currentVariable);
+                    });
+                }
+                updateVarButtonAvailability(available);
 
                 calculateGlobalBounds(currentVariable);
                 renderFrame();

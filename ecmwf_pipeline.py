@@ -71,8 +71,13 @@ AIFS_STEPS = list(range(0, 73, 6))    # 0 h … 72 h, 13 files
 # ECMWF IFS open-data parameters (GRIB2 shortNames). AIFS-single's exact
 # published field set is less documented than IFS HRES's; same request is
 # tried first, with a smaller fallback if the server rejects it.
-OPENDATA_PARAMS = ["2t", "tp", "10u", "10v", "2d"]
-AIFS_FALLBACK_PARAMS = ["2t", "10u", "10v"]
+OPENDATA_PARAMS = ["2t", "tp", "10u", "10v", "2d", "msl", "tcc", "ssrd"]
+# cape/cin are NOT published in ECMWF open-data (confirmed live: "No index
+# entries for param=cape") — don't request them, the server has nothing to
+# silently drop and errors instead.
+# AIFS-single has successfully taken the full 5-param set (2t/tp/10u/10v/2d)
+# in practice; this is the fallback if the extended 8-param set above fails.
+AIFS_FALLBACK_PARAMS = ["2t", "tp", "10u", "10v", "2d"]
 
 # CDS variable names for ERA5
 CDS_VARIABLES = [
@@ -308,7 +313,8 @@ def main():
         json_path     = REPO_ROOT / json_filename
 
         convert_to_json(src_path, json_path, bbox, max_steps,
-                         source_tag=source_tag, model_tag=model_tag, precip_unit="m")
+                         source_tag=source_tag, model_tag=model_tag,
+                         precip_unit="m", cloud_unit="fraction")
         patch_index_html(basin_key, json_filename, run_key, run_label, zone)
         json_filenames.append(json_filename)
 
