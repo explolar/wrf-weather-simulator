@@ -1,3 +1,4 @@
 raw_ecmwf/
+raw_gfs/
 __pycache__/
 *.pyc

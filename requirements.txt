@@ -3,3 +3,4 @@ cfgrib
 eccodes
 netCDF4
 numpy
+requests

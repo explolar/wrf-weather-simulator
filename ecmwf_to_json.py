@@ -99,13 +99,14 @@ def _to_celsius(arr, unit_hint=""):
     return arr
 
 
-def _precip_m_to_mm_interval(arr_3d):
+def _precip_to_mm_interval(arr_3d, unit="m"):
     """
-    Accumulated precipitation in metres → per-interval millimetres.
-    arr_3d shape: (T, H, W)
+    Accumulated precipitation → per-interval millimetres.
+    arr_3d shape: (T, H, W). unit: "m" (ECMWF tp) or "mm" (GFS/ICON APCP,
+    already kg/m**2 == mm).
     """
     import numpy as np
-    mm = arr_3d * 1000.0                          # m → mm
+    mm = arr_3d * 1000.0 if unit == "m" else arr_3d
     diff = np.diff(mm, axis=0, prepend=mm[[0]])   # per-interval
     diff[diff < 0] = 0.0
     return diff
@@ -136,11 +137,11 @@ def _flip_ns(arr_2d, lat):
     return arr_2d
 
 
-def _build_metadata(lon, lat, n_steps, source="ECMWF_IFS"):
+def _build_metadata(lon, lat, n_steps, source="ECMWF_IFS", model="IFS"):
     lats = sorted([float(lat[0]), float(lat[-1])])
     return {
         "source":          source,
-        "model":           "IFS",
+        "model":           model,
         "resolution":      "0.25deg",
         "extent":          [float(lon[0]), lats[0], float(lon[-1]), lats[1]],
         "grid_dimensions": {"width": len(lon), "height": len(lat)},
@@ -153,7 +154,8 @@ def _build_metadata(lon, lat, n_steps, source="ECMWF_IFS"):
 # GRIB2 reader  (ecmwf-opendata files or CDS GRIB downloads)
 # ──────────────────────────────────────────────────────────────────────────────
 
-def read_grib2(path: Path, bbox=None, max_steps=None):
+def read_grib2(path: Path, bbox=None, max_steps=None, precip_unit="m",
+               source_tag="ECMWF_IFS", model_tag="IFS"):
     try:
         import cfgrib
         import numpy as np
@@ -193,7 +195,7 @@ def read_grib2(path: Path, bbox=None, max_steps=None):
 
             # Gather valid_time once
             if time_strs is None and "valid_time" in ds.coords:
-                vt = ds.coords["valid_time"].values
+                vt = np.atleast_1d(ds.coords["valid_time"].values)
                 time_strs = [str(t)[:19].replace("T", "_") for t in vt]
 
             if key not in raw or arr.shape[0] > raw[key].shape[0]:
@@ -202,14 +204,16 @@ def read_grib2(path: Path, bbox=None, max_steps=None):
     if lat is None or lon is None:
         sys.exit("ERROR: could not extract lat/lon from GRIB2 file.")
 
-    return _finalise(raw, lat, lon, time_strs, bbox, max_steps)
+    return _finalise(raw, lat, lon, time_strs, bbox, max_steps,
+                      precip_unit, source_tag, model_tag)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
 # NetCDF4 reader  (CDS / ERA5 downloads)
 # ──────────────────────────────────────────────────────────────────────────────
 
-def read_netcdf(path: Path, bbox=None, max_steps=None):
+def read_netcdf(path: Path, bbox=None, max_steps=None, precip_unit="m",
+                 source_tag="ECMWF_IFS", model_tag="IFS"):
     try:
         import netCDF4 as nc4
         import numpy as np
@@ -254,14 +258,16 @@ def read_netcdf(path: Path, bbox=None, max_steps=None):
                 print(f"[ecmwf_to_json]  {our_key} <- NC var '{c}'")
                 break
     nc.close()
-    return _finalise(raw, lat, lon, time_strs, bbox, max_steps)
+    return _finalise(raw, lat, lon, time_strs, bbox, max_steps,
+                      precip_unit, source_tag, model_tag)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Shared finalisation
 # ──────────────────────────────────────────────────────────────────────────────
 
-def _finalise(raw, lat, lon, time_strs, bbox, max_steps):
+def _finalise(raw, lat, lon, time_strs, bbox, max_steps, precip_unit="m",
+              source_tag="ECMWF_IFS", model_tag="IFS"):
     import numpy as np
 
     # ── Bounding-box crop ─────────────────────────────────────────────────────
@@ -289,8 +295,7 @@ def _finalise(raw, lat, lon, time_strs, bbox, max_steps):
         raw["temperature"] = _to_celsius(raw["temperature"])
 
     if "precipitation" in raw:
-        # ECMWF tp is in metres, accumulated
-        raw["precipitation"] = _precip_m_to_mm_interval(raw["precipitation"])
+        raw["precipitation"] = _precip_to_mm_interval(raw["precipitation"], precip_unit)
 
     if "specific_humidity" not in raw and "_dewpoint" in raw:
         raw["specific_humidity"] = _dewpoint_to_q(raw["_dewpoint"])
@@ -309,7 +314,7 @@ def _finalise(raw, lat, lon, time_strs, bbox, max_steps):
             frame[key] = [round(float(v), 5) for v in arr.flatten()]
         timesteps.append({"time": time_strs[t], "data": frame})
 
-    metadata = _build_metadata(lon, lat, n_steps)
+    metadata = _build_metadata(lon, lat, n_steps, source=source_tag, model=model_tag)
     metadata["variables_present"] = keys_out
     return metadata, timesteps
 
@@ -328,6 +333,13 @@ def main():
                     metavar=("LON_MIN", "LAT_MIN", "LON_MAX", "LAT_MAX"), default=None)
     ap.add_argument("--max-steps", type=int, default=None)
     ap.add_argument("--indent",    type=int, default=None)
+    ap.add_argument("--source-tag", default="ECMWF_IFS",
+                    help="metadata.source value, e.g. ECMWF_IFS, NOAA_GFS")
+    ap.add_argument("--model-tag",  default="IFS",
+                    help="metadata.model value, e.g. IFS, AIFS, GFS")
+    ap.add_argument("--precip-unit", choices=["m", "mm"], default="m",
+                    help="Input precipitation unit before conversion to mm "
+                         "(ECMWF tp: metres: 'm' [default]; GFS/ICON APCP: already mm: 'mm')")
     args = ap.parse_args()
 
     src = Path(args.input)
@@ -337,10 +349,9 @@ def main():
     out = Path(args.output) if args.output else src.with_suffix(".json")
 
     is_grib = src.suffix.lower() in (".grb", ".grb2", ".grib", ".grib2")
-    if is_grib:
-        metadata, timesteps = read_grib2(src, args.bbox, args.max_steps)
-    else:
-        metadata, timesteps = read_netcdf(src, args.bbox, args.max_steps)
+    reader = read_grib2 if is_grib else read_netcdf
+    metadata, timesteps = reader(src, args.bbox, args.max_steps,
+                                  args.precip_unit, args.source_tag, args.model_tag)
 
     payload = {"metadata": metadata, "timesteps": timesteps}
     with open(out, "w") as f:

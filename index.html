@@ -68,13 +68,14 @@
         /* Top bar */
         .topbar {
             position: fixed;
-            top: 14px; left: 14px; right: 14px;
-            height: 42px;
+            top: 12px; left: 14px; right: 14px;
+            height: 38px;
             z-index: 500;
             display: flex;
             align-items: center;
-            padding: 0 14px;
+            padding: 0 12px;
             gap: 10px;
+            border-radius: 10px;
         }
         .brand { display: flex; align-items: center; gap: 8px; }
         .brand-mark {
@@ -116,47 +117,48 @@
         /* Layer picker — floating top-left */
         .layer-panel {
             position: fixed;
-            top: 88px; left: 18px;
-            width: 270px;
+            top: 64px; left: 14px;
+            width: 212px;
             z-index: 400;
-            max-height: calc(100vh - 200px);
+            max-height: calc(100vh - 170px);
             display: flex;
             flex-direction: column;
             overflow: hidden;
+            border-radius: 12px;
         }
         .layer-panel-head {
-            display: flex; align-items: center; gap: 10px;
-            padding: 14px 16px;
+            display: flex; align-items: center; gap: 8px;
+            padding: 10px 12px;
             border-bottom: 1px solid var(--line);
-            font: 700 12px 'DM Mono', monospace;
-            letter-spacing: 1px;
-            color: var(--ink);
+            font: 700 10.5px 'DM Mono', monospace;
+            letter-spacing: 0.8px;
+            color: var(--muted);
             cursor: pointer;
             user-select: none;
         }
-        .layer-panel-head .chevron { margin-left: auto; color: var(--muted); transition: transform 0.2s; }
+        .layer-panel-head .chevron { margin-left: auto; color: var(--muted); transition: transform 0.2s; font-size: 11px; }
         .layer-panel.collapsed .layer-panel-body { display: none; }
         .layer-panel.collapsed .chevron { transform: rotate(-90deg); }
 
         .layer-panel-body {
-            padding: 14px 16px 16px;
+            padding: 10px 12px 12px;
             overflow-y: auto;
         }
 
-        .field-block { margin-bottom: 14px; }
+        .field-block { margin-bottom: 10px; }
         .field-block:last-child { margin-bottom: 0; }
         .field-block label {
-            display: block; font: 600 10px 'DM Mono', monospace;
-            letter-spacing: 1.2px; color: var(--muted); margin-bottom: 7px;
+            display: block; font: 600 9px 'DM Mono', monospace;
+            letter-spacing: 1px; color: var(--muted); margin-bottom: 5px;
         }
 
         select.control-select {
             background: rgba(255,255,255,0.05);
             color: var(--ink);
             border: 1px solid var(--line);
-            padding: 0.6rem 0.8rem;
-            border-radius: 9px;
-            font-size: 0.85rem;
+            padding: 0.45rem 0.65rem;
+            border-radius: 8px;
+            font-size: 0.76rem;
             font-weight: 600;
             width: 100%;
             cursor: pointer;
@@ -164,8 +166,8 @@
             appearance: none;
             background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'%3E%3Cpath fill='%2390a0b8' d='M2 0L0 2h4zm0 5L0 3h4z'/%3E%3C/svg%3E");
             background-repeat: no-repeat;
-            background-position: right 0.8rem center;
-            background-size: 8px 10px;
+            background-position: right 0.65rem center;
+            background-size: 7px 9px;
             transition: border-color 0.15s;
         }
         select.control-select:hover { border-color: rgba(255,255,255,0.25); }
@@ -175,12 +177,12 @@
             color: var(--ink);
         }
 
-        .variable-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+        .variable-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
         .var-btn {
             background: rgba(255,255,255,0.04); color: var(--ink);
-            border: 1px solid var(--line); padding: 10px 10px;
-            border-radius: 8px; font-size: 0.76rem; font-weight: 500;
-            display: flex; align-items: center; justify-content: center; gap: 6px;
+            border: 1px solid var(--line); padding: 7px 8px;
+            border-radius: 7px; font-size: 0.7rem; font-weight: 500;
+            display: flex; align-items: center; justify-content: center; gap: 5px;
             cursor: pointer; transition: all 0.18s;
             font-family: inherit;
         }
@@ -195,8 +197,8 @@
         .run-forecast-btn {
             width: 100%; border: 1px dashed rgba(251,191,36,0.5);
             background: rgba(251,191,36,0.08); color: #fbbf6a;
-            border-radius: 9px; padding: 10px; margin-top: 8px;
-            font: 600 11px 'DM Mono', monospace; letter-spacing: 0.5px;
+            border-radius: 8px; padding: 8px; margin-top: 6px;
+            font: 600 10px 'DM Mono', monospace; letter-spacing: 0.4px;
             cursor: pointer; transition: all 0.18s;
         }
         .run-forecast-btn:hover { background: rgba(251,191,36,0.14); }
@@ -205,12 +207,13 @@
         /* Source badge */
         .source-badge {
             display: inline-flex; align-items: center; gap: 5px;
-            margin-top: 8px; padding: 5px 10px;
-            border-radius: 7px; font: 700 10px 'DM Mono', monospace;
-            letter-spacing: 0.8px; width: 100%; justify-content: center;
+            margin-top: 6px; padding: 4px 8px;
+            border-radius: 6px; font: 700 9px 'DM Mono', monospace;
+            letter-spacing: 0.6px; width: 100%; justify-content: center;
         }
         .source-badge.wrf   { background: rgba(34,211,197,0.10); color: var(--teal); border: 1px solid rgba(34,211,197,0.25); }
         .source-badge.ecmwf { background: rgba(99,102,241,0.12); color: #a5b4fc;   border: 1px solid rgba(99,102,241,0.30); }
+        .source-badge.gfs   { background: rgba(96,165,250,0.12); color: #93c5fd;   border: 1px solid rgba(96,165,250,0.30); }
 
         /* Resolution tag inside info-card */
         .res-tag { font: 600 9px 'DM Mono', monospace; letter-spacing: 1px; color: var(--muted); margin-bottom: 4px; }
@@ -218,37 +221,38 @@
         /* Info card — floating top-right (WeatherEx "Your Area" style) */
         .info-card {
             position: fixed;
-            top: 88px; right: 18px;
-            width: 210px;
+            top: 64px; right: 14px;
+            width: 168px;
             z-index: 400;
-            padding: 16px;
+            padding: 12px;
+            border-radius: 12px;
         }
         .info-card-label {
-            display: flex; align-items: center; gap: 6px;
-            font: 700 10px 'DM Mono', monospace; letter-spacing: 1.2px;
-            color: var(--teal); margin-bottom: 10px;
+            display: flex; align-items: center; gap: 5px;
+            font: 700 9px 'DM Mono', monospace; letter-spacing: 1px;
+            color: var(--teal); margin-bottom: 8px;
         }
-        .info-card-title { font-size: 1.05rem; font-weight: 700; margin-bottom: 14px; letter-spacing: -0.3px; }
+        .info-card-title { font-size: 0.88rem; font-weight: 700; margin-bottom: 10px; letter-spacing: -0.2px; }
 
-        .colorbar-row { display: flex; gap: 12px; align-items: center; }
+        .colorbar-row { display: flex; gap: 10px; align-items: center; }
         .colorbar-gradient {
-            width: 18px; height: 130px;
+            width: 14px; height: 100px;
             background: linear-gradient(to top, #1e3a8a, #0000ff, #00ffff, #00ff00, #ffff00, #ff4500, #ff0000);
             border-radius: 999px;
             box-shadow: inset 0 0 6px rgba(0,0,0,0.4);
         }
         .colorbar-labels {
             display: flex; flex-direction: column; justify-content: space-between;
-            height: 130px; font-size: 0.72rem; font-family: 'DM Mono', monospace;
+            height: 100px; font-size: 0.65rem; font-family: 'DM Mono', monospace;
             color: var(--muted);
         }
-        .colorbar-unit { font-size: 0.75rem; font-weight: 700; color: var(--ink); margin-bottom: 4px; text-align: right; }
+        .colorbar-unit { font-size: 0.7rem; font-weight: 700; color: var(--ink); margin-bottom: 4px; text-align: right; }
 
         .lock-btn {
-            width: 100%; margin-top: 14px;
+            width: 100%; margin-top: 10px;
             background: rgba(255,255,255,0.05); color: var(--ink);
-            border: 1px solid var(--line); border-radius: 9px;
-            padding: 9px; font-size: 0.78rem; font-weight: 600;
+            border: 1px solid var(--line); border-radius: 8px;
+            padding: 7px; font-size: 0.7rem; font-weight: 600;
             cursor: pointer; transition: all 0.18s;
         }
         .lock-btn:hover { border-color: rgba(34,211,197,0.4); color: var(--teal); }
@@ -294,6 +298,75 @@
         }
         .ist-highlight { color: #4ade80; font-weight: 600; margin-left: 5px; }
 
+        /* Model picker — floating bottom-right, collapsed pill that expands
+           upward into a radio list (model name + native resolution column) */
+        .model-picker {
+            position: fixed;
+            right: 18px; bottom: 18px;
+            z-index: 410;
+            width: 220px;
+            display: flex;
+            flex-direction: column;
+        }
+        .model-picker-list {
+            display: none;
+            flex-direction: column;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 8px;
+            max-height: 260px;
+            overflow-y: auto;
+        }
+        .model-picker.open .model-picker-list { display: flex; }
+        .model-picker.open .mp-toggle-chevron { transform: rotate(180deg); }
+
+        .mp-row {
+            display: flex; align-items: center; gap: 9px;
+            padding: 9px 12px;
+            cursor: pointer;
+            font-size: 0.78rem; font-weight: 600;
+            color: var(--ink);
+            transition: background 0.15s;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .mp-row:last-child { border-bottom: none; }
+        .mp-row:hover { background: rgba(255,255,255,0.05); }
+        .mp-row.selected { background: var(--teal); color: #06201d; }
+        .mp-row.selected .mp-dot { border-color: #06201d; }
+        .mp-row.selected .mp-dot::after { background: #06201d; }
+        .mp-row.selected .mp-res { color: rgba(6,32,29,0.65); }
+
+        .mp-dot {
+            width: 13px; height: 13px; border-radius: 50%;
+            border: 1.5px solid var(--muted);
+            flex-shrink: 0;
+            display: grid; place-items: center;
+        }
+        .mp-dot::after {
+            content: ''; width: 6px; height: 6px; border-radius: 50%;
+            background: transparent;
+        }
+
+        .mp-name { flex: 1; }
+        .mp-res { font: 600 11px 'DM Mono', monospace; color: var(--muted); }
+
+        .model-picker-toggle {
+            display: flex; align-items: center; gap: 10px;
+            padding: 8px 14px;
+            border-radius: 999px;
+            cursor: pointer;
+            user-select: none;
+        }
+        .mp-toggle-copy { display: flex; flex-direction: column; line-height: 1.3; }
+        .mp-toggle-label { font: 700 8px 'DM Mono', monospace; letter-spacing: 1px; color: var(--muted); }
+        .mp-toggle-current { display: flex; align-items: center; gap: 7px; font-size: 0.8rem; font-weight: 700; }
+        .mp-toggle-res {
+            font: 600 10px 'DM Mono', monospace; color: var(--teal);
+            background: rgba(34,211,197,0.12); border: 1px solid rgba(34,211,197,0.3);
+            padding: 1px 7px; border-radius: 999px;
+        }
+        .mp-toggle-chevron { margin-left: auto; color: var(--muted); font-size: 11px; transition: transform 0.2s; }
+
         /* Loading / no-data overlays */
         .loading-overlay {
             position: fixed; inset: 0;
@@ -335,6 +408,7 @@
             .layer-panel { width: calc(100vw - 36px); }
             .info-card { display: none; }
             .brand-copy small { display: none; }
+            .model-picker { width: calc(100vw - 36px); right: 18px; bottom: 96px; }
         }
     </style>
 </head>
@@ -364,14 +438,11 @@
 
     <div id="layerPanel" class="layer-panel glass">
         <div class="layer-panel-head" id="layerPanelToggle">
-            <span>⚙ FORECAST CONTROLS</span>
+            <span>⚙ CONTROLS</span>
             <span class="chevron">⌃</span>
         </div>
         <div class="layer-panel-body">
-            <div class="field-block">
-                <label>DOMAIN / BASIN</label>
-                <select id="basinSelect" class="control-select"></select>
-            </div>
+            <select id="basinSelect" class="control-select hidden"></select>
             <div class="field-block">
                 <label>ZONE</label>
                 <select id="locationSelect" class="control-select"></select>
@@ -412,6 +483,20 @@
         <div class="time-display">Time (IST): <span id="timeStringIST" class="ist-highlight">--:--:--</span></div>
     </div>
 
+    <div id="modelPicker" class="model-picker">
+        <div id="modelPickerList" class="model-picker-list glass"></div>
+        <div id="modelPickerToggle" class="model-picker-toggle glass">
+            <div class="mp-toggle-copy">
+                <span class="mp-toggle-label">SELECT MODEL</span>
+                <span class="mp-toggle-current">
+                    <span id="mpCurrentName">—</span>
+                    <span id="mpCurrentRes" class="mp-toggle-res hidden"></span>
+                </span>
+            </div>
+            <span class="mp-toggle-chevron">⌃</span>
+        </div>
+    </div>
+
     <script>
         // ==========================================
         // DATA CONFIGURATION
@@ -423,49 +508,6 @@
         // no-data state with a Run Forecast stub button.
         // ==========================================
         const basins = {
-            "local_domains": {
-                label: "Local Domain (WRF d03)",
-                zones: {
-                    "kharagpur": {
-                        label: "Kharagpur",
-                        shapefile: "kharagpur.geojson",
-                        dataBounds: [[22.30247, 87.24], [22.35525, 87.35]],
-                        viewBounds: [[22.29855, 87.25539], [22.35254, 87.34826]],
-                        zoom: 14,
-                        years: {
-                            "2024": { dataFile: "kharagpur_d03.json" }
-                        }
-                    },
-                    "kolkata": {
-                        label: "Kolkata",
-                        shapefile: "kolkata.geojson",
-                        dataBounds: [[22.418, 88.1542], [22.7585, 88.56]],
-                        viewBounds: [[22.41865, 88.18005], [22.63429, 88.55152]],
-                        zoom: 12,
-                        years: {
-                            "2024": { dataFile: "kolkata_d03.json" }
-                        }
-                    }
-                }
-            },
-            "ganga_basin": {
-                label: "Ganga Basin (JJAS)",
-                zones: {
-                    "full_basin": {
-                        label: "Full Ganga Basin",
-                        shapefile: null,
-                        dataBounds: [[21.360916, 73.429047], [31.412743, 88.418961]],
-                        viewBounds: [[20.5, 72.0], [32.2, 90.0]],
-                        zoom: 6,
-                        years: {
-                            "2024": { dataFile: "ganga_basin_jjas_2024.json" },
-                            "2025": { dataFile: "ganga_basin_jjas_2025.json" },
-                            "2026": { dataFile: null }
-                        }
-                    }
-                }
-            },
-
             // ---------------------------------------------------------------
             // ECMWF IFS 0.25° Forecast  (~28 km public grid, IFS native ~9 km)
             // Source   : European Centre for Medium-Range Weather Forecasts
@@ -478,11 +520,12 @@
             "ecmwf_ifs": {
                 label: "ECMWF IFS Forecast (0.25°)",
                 source: "ecmwf",
+                nativeResKm: 9,
                 zones: {
                     "india_subcontinent": {
                         label: "India Subcontinent (full domain)",
                         shapefile: "india-outline.geojson",
-                        dataBounds: [[7.0, 67.0], [36.0, 97.0]],
+                        dataBounds: [[7.0, 67.0], [38.0, 98.0]],
                         viewBounds: [[6.0, 65.0], [38.0, 100.0]],
                         zoom: 5,
                         resolutionKm: 28,
@@ -490,7 +533,8 @@
                             "2026-placeholder": {
                                 dataFile: "ecmwf_ifs_india_placeholder.json",
                                 label: "2026 Demo (placeholder grid)"
-                            },                            "20261029_00Z": {
+                            },
+                            "20261029_00Z": {
                                 dataFile: "ecmwf_ifs_india_subcontinent_20261029_00Z.json",
                                 label: "2026-10-29 00Z (ECMWF IFS open-data)"
                             },
@@ -523,7 +567,8 @@
                         viewBounds: [[7.0, 79.0], [28.0, 99.0]],
                         zoom: 5,
                         resolutionKm: 28,
-                        years: {                            "20261029_00Z": {
+                        years: {
+                            "20261029_00Z": {
                                 dataFile: "ecmwf_ifs_east_india_20261029_00Z.json",
                                 label: "2026-10-29 00Z (ECMWF IFS open-data)"
                             },
@@ -541,6 +586,160 @@
                             "20261029_00Z": {
                                 dataFile: "ecmwf_ifs_north_india_20261029_00Z.json",
                                 label: "2026-10-29 00Z (ECMWF IFS open-data)"
+                            },
+
+                            "operational": { dataFile: null, label: "Operational run (not yet loaded)" }
+                        }
+                    }
+                }
+            },
+
+            // ---------------------------------------------------------------
+            // ECMWF AIFS Forecast  (AI model, 0.25° open-data, 6-hourly steps)
+            // Converter: same ecmwf_to_json.py as ecmwf_ifs
+            //   Usage  : python ecmwf_pipeline.py --model aifs-single --zone all
+            // ---------------------------------------------------------------
+            "ecmwf_aifs": {
+                label: "ECMWF AIFS Forecast (AI model, 0.25°)",
+                source: "ecmwf",
+                nativeResKm: 28,
+                zones: {
+                    "india_subcontinent": {
+                        label: "India Subcontinent (full domain)",
+                        shapefile: "india-outline.geojson",
+                        dataBounds: [[7.0, 67.0], [38.0, 98.0]],
+                        viewBounds: [[6.0, 65.0], [38.0, 100.0]],
+                        zoom: 5,
+                        resolutionKm: 28,
+                        years: {
+                            "20261029_00Z": {
+                                dataFile: "ecmwf_aifs_india_subcontinent_20261029_00Z.json",
+                                label: "2026-10-29 00Z (ECMWF AIFS open-data)"
+                            },
+
+                            "operational": { dataFile: null, label: "Operational run (not yet loaded)" }
+                        }
+                    },
+                    "west_india": {
+                        label: "Western India",
+                        shapefile: "india-outline.geojson",
+                        dataBounds: [[8.0, 67.0], [30.0, 78.0]],
+                        viewBounds: [[7.0, 65.0], [32.0, 80.0]],
+                        zoom: 5,
+                        resolutionKm: 28,
+                        years: {
+                            "20261029_00Z": {
+                                dataFile: "ecmwf_aifs_west_india_20261029_00Z.json",
+                                label: "2026-10-29 00Z (ECMWF AIFS open-data)"
+                            },
+
+                            "operational": { dataFile: null, label: "Operational run (not yet loaded)" }
+                        }
+                    },
+                    "east_india": {
+                        label: "Eastern India & Bay of Bengal",
+                        shapefile: "india-outline.geojson",
+                        dataBounds: [[8.0, 80.0], [27.0, 97.0]],
+                        viewBounds: [[7.0, 79.0], [28.0, 99.0]],
+                        zoom: 5,
+                        resolutionKm: 28,
+                        years: {
+                            "20261029_00Z": {
+                                dataFile: "ecmwf_aifs_east_india_20261029_00Z.json",
+                                label: "2026-10-29 00Z (ECMWF AIFS open-data)"
+                            },
+
+                            "operational": { dataFile: null, label: "Operational run (not yet loaded)" }
+                        }
+                    },
+                    "north_india": {
+                        label: "Northern India & Himalayan Foothills",
+                        shapefile: "india-outline.geojson",
+                        dataBounds: [[27.0, 70.0], [36.0, 95.0]],
+                        viewBounds: [[26.0, 68.0], [37.0, 97.0]],
+                        zoom: 5,
+                        resolutionKm: 28,
+                        years: {
+                            "20261029_00Z": {
+                                dataFile: "ecmwf_aifs_north_india_20261029_00Z.json",
+                                label: "2026-10-29 00Z (ECMWF AIFS open-data)"
+                            },
+
+                            "operational": { dataFile: null, label: "Operational run (not yet loaded)" }
+                        }
+                    }
+                }
+            },
+
+            // ---------------------------------------------------------------
+            // NOAA GFS Forecast  (0.25° open-data, free, no auth)
+            // Converter: same ecmwf_to_json.py (generic GRIB2 reader)
+            //   Usage  : python gfs_pipeline.py --zone all
+            // ---------------------------------------------------------------
+            "gfs": {
+                label: "NOAA GFS Forecast (0.25°)",
+                source: "gfs",
+                nativeResKm: 22,
+                zones: {
+                    "india_subcontinent": {
+                        label: "India Subcontinent (full domain)",
+                        shapefile: "india-outline.geojson",
+                        dataBounds: [[7.0, 67.0], [38.0, 98.0]],
+                        viewBounds: [[6.0, 65.0], [38.0, 100.0]],
+                        zoom: 5,
+                        resolutionKm: 28,
+                        years: {
+                            "20261029_00Z": {
+                                dataFile: "gfs_india_subcontinent_20261029_00Z.json",
+                                label: "2026-10-29 00Z (NOAA GFS open-data)"
+                            },
+
+                            "operational": { dataFile: null, label: "Operational run (not yet loaded)" }
+                        }
+                    },
+                    "west_india": {
+                        label: "Western India",
+                        shapefile: "india-outline.geojson",
+                        dataBounds: [[8.0, 67.0], [30.0, 78.0]],
+                        viewBounds: [[7.0, 65.0], [32.0, 80.0]],
+                        zoom: 5,
+                        resolutionKm: 28,
+                        years: {
+                            "20261029_00Z": {
+                                dataFile: "gfs_west_india_20261029_00Z.json",
+                                label: "2026-10-29 00Z (NOAA GFS open-data)"
+                            },
+
+                            "operational": { dataFile: null, label: "Operational run (not yet loaded)" }
+                        }
+                    },
+                    "east_india": {
+                        label: "Eastern India & Bay of Bengal",
+                        shapefile: "india-outline.geojson",
+                        dataBounds: [[8.0, 80.0], [27.0, 97.0]],
+                        viewBounds: [[7.0, 79.0], [28.0, 99.0]],
+                        zoom: 5,
+                        resolutionKm: 28,
+                        years: {
+                            "20261029_00Z": {
+                                dataFile: "gfs_east_india_20261029_00Z.json",
+                                label: "2026-10-29 00Z (NOAA GFS open-data)"
+                            },
+
+                            "operational": { dataFile: null, label: "Operational run (not yet loaded)" }
+                        }
+                    },
+                    "north_india": {
+                        label: "Northern India & Himalayan Foothills",
+                        shapefile: "india-outline.geojson",
+                        dataBounds: [[27.0, 70.0], [36.0, 95.0]],
+                        viewBounds: [[26.0, 68.0], [37.0, 97.0]],
+                        zoom: 5,
+                        resolutionKm: 28,
+                        years: {
+                            "20261029_00Z": {
+                                dataFile: "gfs_north_india_20261029_00Z.json",
+                                label: "2026-10-29 00Z (NOAA GFS open-data)"
                             },
 
                             "operational": { dataFile: null, label: "Operational run (not yet loaded)" }
@@ -616,6 +815,48 @@
             });
         }
 
+        function populateModelPicker() {
+            const list = document.getElementById('modelPickerList');
+            list.innerHTML = '';
+            Object.entries(basins).forEach(([key, basin]) => {
+                const row = document.createElement('div');
+                row.className = 'mp-row';
+                row.dataset.key = key;
+                row.innerHTML = `
+                    <span class="mp-dot"></span>
+                    <span class="mp-name">${basin.label.replace(/\s*\(.*?\)\s*$/, '')}</span>
+                    ${basin.nativeResKm ? `<span class="mp-res">${basin.nativeResKm}km</span>` : ''}
+                `;
+                row.addEventListener('click', () => {
+                    if (basinSelect.value !== key) {
+                        basinSelect.value = key;
+                        basinSelect.dispatchEvent(new Event('change'));
+                    }
+                    document.getElementById('modelPicker').classList.remove('open');
+                    updateModelPickerDisplay();
+                });
+                list.appendChild(row);
+            });
+            updateModelPickerDisplay();
+        }
+
+        function updateModelPickerDisplay() {
+            const basin = basins[basinSelect.value];
+            if (!basin) return;
+            document.getElementById('mpCurrentName').textContent =
+                basin.label.replace(/\s*\(.*?\)\s*$/, '');
+            const resEl = document.getElementById('mpCurrentRes');
+            if (basin.nativeResKm) {
+                resEl.textContent = basin.nativeResKm + 'km';
+                resEl.classList.remove('hidden');
+            } else {
+                resEl.classList.add('hidden');
+            }
+            document.querySelectorAll('#modelPickerList .mp-row').forEach(row => {
+                row.classList.toggle('selected', row.dataset.key === basinSelect.value);
+            });
+        }
+
         function updateSourceBadge() {
             const basin = basins[basinSelect.value];
             const badge = document.getElementById('sourceBadge');
@@ -623,8 +864,8 @@
             if (!basin || !badge) return;
             const src = basin.source || 'wrf';
             badge.className = 'source-badge ' + src;
-            if (src === 'ecmwf') {
-                badge.innerHTML = '&#127760; ECMWF IFS &middot; 0.25&deg;';
+            if (src === 'ecmwf' || src === 'gfs') {
+                badge.innerHTML = `&#127760; ${basin.label}`;
             } else {
                 badge.innerHTML = '\uD83D\uDCBB WRF Simulation Output';
             }
@@ -936,6 +1177,7 @@
 
         // Event Listeners
         basinSelect.addEventListener('change', () => {
+            updateModelPickerDisplay();
             populateLocationSelect();
             populateYearSelect();
             loadCurrentSelection();
@@ -974,6 +1216,16 @@
             layerPanel.classList.toggle('collapsed');
         });
 
+        document.getElementById('modelPickerToggle').addEventListener('click', () => {
+            document.getElementById('modelPicker').classList.toggle('open');
+        });
+        document.addEventListener('click', (e) => {
+            const picker = document.getElementById('modelPicker');
+            if (picker.classList.contains('open') && !picker.contains(e.target)) {
+                picker.classList.remove('open');
+            }
+        });
+
         function loadIndiaOutline() {
             fetch('india-outline.geojson')
                 .then(res => res.ok ? res.json() : null)
@@ -991,7 +1243,7 @@
         window.addEventListener('DOMContentLoaded', () => {
             map = L.map('map', {
                 zoomControl: false
-            }).setView([22.5, 87.5], 10);
+            }).setView([22, 82], 5);
 
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 maxZoom: 18,
@@ -1003,6 +1255,7 @@
             loadIndiaOutline();
 
             populateBasinSelect();
+            populateModelPicker();
             populateLocationSelect();
             populateYearSelect();
             populateVarButtons();

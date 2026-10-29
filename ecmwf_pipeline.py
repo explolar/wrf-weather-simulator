@@ -44,41 +44,35 @@ USAGE
   # Every zone in one run (1 download, N conversions, 1 commit) — used by
   # schedule_ecmwf.bat for the daily automated run
   python ecmwf_pipeline.py --zone all
+
+  # AIFS (ECMWF's AI forecast model) instead of physics-based IFS HRES —
+  # same free open-data client, just a different model. Runs 6-hourly
+  # (not 3-hourly) and its exact field set is less battle-tested than IFS;
+  # if a param request fails, rerun with --aifs-minimal-params.
+  python ecmwf_pipeline.py --model aifs-single --zone all
 """
 
 import argparse
-import json
-import os
-import re
-import subprocess
-import sys
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from pathlib import Path
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Config
-# ──────────────────────────────────────────────────────────────────────────────
+from forecast_common import (
+    log, abort, REPO_ROOT, ZONE_BBOXES, DEFAULT_ZONE, DEFAULT_BBOX,
+    convert_to_json, patch_index_html, git_commit_push,
+)
 
-REPO_ROOT  = Path(__file__).parent.resolve()
-CONVERTER  = REPO_ROOT / "ecmwf_to_json.py"
-INDEX_HTML = REPO_ROOT / "index.html"
-RAW_DIR    = REPO_ROOT / "raw_ecmwf"
+RAW_DIR = REPO_ROOT / "raw_ecmwf"
 
-DEFAULT_BBOX = [67.0, 7.0, 98.0, 38.0]    # India
-DEFAULT_ZONE = "india_subcontinent"
-DEFAULT_STEPS = list(range(0, 73, 3))       # 0 h … 72 h in 3-h steps (25 files)
+# IFS HRES: 3-hourly out to 72h. AIFS-single: ECMWF only publishes it
+# 6-hourly, so it gets its own step list.
+IFS_STEPS  = list(range(0, 73, 3))    # 0 h … 72 h, 25 files
+AIFS_STEPS = list(range(0, 73, 6))    # 0 h … 72 h, 13 files
 
-# All index.html zones under ecmwf_ifs, with their W S E N bbox.
-# --zone all downloads the GRIB2 once and converts it for every zone here.
-ZONE_BBOXES = {
-    "india_subcontinent": [67.0, 7.0, 98.0, 38.0],
-    "west_india":         [67.0, 8.0, 78.0, 30.0],
-    "east_india":         [80.0, 8.0, 97.0, 27.0],
-    "north_india":        [70.0, 27.0, 95.0, 36.0],
-}
-
-# ECMWF IFS open-data parameters (GRIB2 shortNames)
+# ECMWF IFS open-data parameters (GRIB2 shortNames). AIFS-single's exact
+# published field set is less documented than IFS HRES's; same request is
+# tried first, with a smaller fallback if the server rejects it.
 OPENDATA_PARAMS = ["2t", "tp", "10u", "10v", "2d"]
+AIFS_FALLBACK_PARAMS = ["2t", "10u", "10v"]
 
 # CDS variable names for ERA5
 CDS_VARIABLES = [
@@ -90,19 +84,6 @@ CDS_VARIABLES = [
 ]
 
 CDS_CREDS_FILE = Path.home() / ".cdsapirc"
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Logging
-# ──────────────────────────────────────────────────────────────────────────────
-
-def log(msg, tag="INFO"):
-    ts = datetime.now().strftime("%H:%M:%S")
-    tags = {"INFO": "[i]", "OK": "[ok]", "WARN": "[!]", "ERR": "[X]", "STEP": ">>>"}
-    print(f"[{ts}] {tags.get(tag,'[ ]')} {msg}", flush=True)
-
-def abort(msg):
-    log(msg, "ERR")
-    sys.exit(1)
 
 # ──────────────────────────────────────────────────────────────────────────────
 # STEP 0  —  CDS credential setup (optional, only for cdsapi/ERA5 mode)
@@ -124,12 +105,14 @@ def setup_cds():
 # STEP 1A  —  ECMWF Open Data download  (FREE, no auth)
 # ──────────────────────────────────────────────────────────────────────────────
 
-def download_opendata(date_str, cycle, steps, out_dir: Path) -> Path:
+def download_opendata(date_str, cycle, steps, out_dir: Path, model="ifs") -> Path:
     """
-    Download ECMWF IFS HRES open data (0.25°) using the ecmwf-opendata client.
+    Download ECMWF open data (0.25°) using the ecmwf-opendata client.
     Returns path to the downloaded GRIB2 file.
     FREE — no account or API key needed.
     Data available for the last ~10 days.
+    model: "ifs" (physics-based HRES, default) or "aifs-single"
+           (ECMWF's AI forecast model, deterministic run).
     """
     try:
         from ecmwf.opendata import Client
@@ -140,22 +123,40 @@ def download_opendata(date_str, cycle, steps, out_dir: Path) -> Path:
         )
 
     out_dir.mkdir(parents=True, exist_ok=True)
-    filename = f"ecmwf_ifs_{date_str}_{cycle}Z.grib2"
+    tag = "ifs" if model == "ifs" else "aifs"
+    filename = f"ecmwf_{tag}_{date_str}_{cycle}Z.grib2"
     out_path  = out_dir / filename
 
-    log(f"Downloading ECMWF IFS open data — {date_str} {cycle}Z, steps {steps[0]}..{steps[-1]}h ...", "STEP")
+    model_label = "ECMWF IFS HRES" if model == "ifs" else "ECMWF AIFS (AI model)"
+    log(f"Downloading {model_label} open data — {date_str} {cycle}Z, steps {steps[0]}..{steps[-1]}h ...", "STEP")
     log("  Source: ECMWF open-data (free, no auth required)")
 
     client = Client(source="ecmwf")
-    client.retrieve(
-        date   = date_str,
-        time   = int(cycle),
-        step   = steps,
-        stream = "oper",
-        type   = "fc",
-        param  = OPENDATA_PARAMS,
-        target = str(out_path),
-    )
+    try:
+        client.retrieve(
+            date   = date_str,
+            time   = int(cycle),
+            step   = steps,
+            stream = "oper",
+            type   = "fc",
+            model  = model,
+            param  = OPENDATA_PARAMS,
+            target = str(out_path),
+        )
+    except Exception as e:
+        if model == "ifs":
+            abort(f"ECMWF open-data retrieval failed: {e}")
+        log(f"Full param set failed ({e}); retrying with fallback params {AIFS_FALLBACK_PARAMS} ...", "WARN")
+        client.retrieve(
+            date   = date_str,
+            time   = int(cycle),
+            step   = steps,
+            stream = "oper",
+            type   = "fc",
+            model  = model,
+            param  = AIFS_FALLBACK_PARAMS,
+            target = str(out_path),
+        )
 
     size_mb = out_path.stat().st_size / 1_048_576
     log(f"Downloaded: {out_path.name}  ({size_mb:.1f} MB)", "OK")
@@ -212,151 +213,37 @@ def download_cds(date_str, cycle, bbox, out_dir: Path) -> Path:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# STEP 2  —  Convert to HydroClim Cast JSON
-# ──────────────────────────────────────────────────────────────────────────────
-
-def convert_to_json(src_path: Path, json_path: Path, bbox, max_steps: int) -> Path:
-    log(f"Converting {src_path.name} -> {json_path.name} ...", "STEP")
-
-    if not CONVERTER.exists():
-        abort(f"Converter not found: {CONVERTER}")
-
-    cmd = [sys.executable, str(CONVERTER),
-           "--input",  str(src_path),
-           "--output", str(json_path)]
-    if bbox:
-        cmd += ["--bbox"] + [str(v) for v in bbox]
-    if max_steps:
-        cmd += ["--max-steps", str(max_steps)]
-
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    for line in result.stdout.strip().splitlines():
-        log(f"  {line}")
-    if result.returncode != 0:
-        log(result.stderr, "ERR")
-        abort("Conversion failed.")
-
-    size_mb = json_path.stat().st_size / 1_048_576
-    log(f"JSON ready: {json_path.name}  ({size_mb:.1f} MB)", "OK")
-    return json_path
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# STEP 3  —  Patch index.html
-# ──────────────────────────────────────────────────────────────────────────────
-
-def _run_label(date_str, cycle, source):
-    d = datetime.strptime(date_str, "%Y%m%d")
-    src_tag = "ERA5/CDS" if source == "cds" else "ECMWF IFS open-data"
-    return f"{d.strftime('%Y-%m-%d')} {cycle}Z ({src_tag})"
-
-
-def patch_index_html(json_filename: str, date_str: str, cycle: str,
-                     source: str, zone: str):
-    log(f"Patching {INDEX_HTML.name} ...", "STEP")
-
-    content = INDEX_HTML.read_text(encoding="utf-8")
-    run_key   = f"{date_str}_{cycle}Z"
-    run_label = _run_label(date_str, cycle, source)
-
-    new_entry = (
-        f'                            "{run_key}": {{\n'
-        f'                                dataFile: "{json_filename}",\n'
-        f'                                label: "{run_label}"\n'
-        f'                            }},\n'
-    )
-
-    # Locate ecmwf_ifs → zone → years
-    basin_start = content.find('"ecmwf_ifs"')
-    if basin_start == -1:
-        abort('ecmwf_ifs basin not found in index.html. Was the NCMRWF→ECMWF patch applied?')
-
-    zone_pos = content.find(f'"{zone}"', basin_start)
-    if zone_pos == -1:
-        abort(f"Zone '{zone}' not found inside ecmwf_ifs.")
-
-    years_pos = content.find('years:', zone_pos)
-    if years_pos == -1:
-        abort(f"'years:' block not found for zone '{zone}'.")
-    years_open = content.find('{', years_pos) + 1
-    if years_open == 0:
-        abort(f"Could not locate opening brace of 'years:' block for zone '{zone}'.")
-
-    # Find the matching closing brace for this zone's years block (brace counting),
-    # so entry lookup/replacement stays scoped to THIS zone and never touches others.
-    depth = 1
-    years_close = years_open
-    for i in range(years_open, len(content)):
-        if content[i] == '{':
-            depth += 1
-        elif content[i] == '}':
-            depth -= 1
-            if depth == 0:
-                years_close = i
-                break
-    else:
-        abort(f"Could not locate closing brace of 'years:' block for zone '{zone}'.")
-
-    years_block = content[years_open:years_close]
-
-    # Replace existing entry for same key (scoped to this zone's years block only)
-    if f'"{run_key}"' in years_block:
-        log(f"  Entry '{run_key}' exists — replacing.", "WARN")
-        old_re = re.compile(
-            rf'\s*"{re.escape(run_key)}":\s*{{[^}}]*}},?\n?', re.DOTALL
-        )
-        years_block, n = old_re.subn(new_entry, years_block, count=1)
-        if n == 0:
-            abort(f"Could not locate existing '{run_key}' entry to replace in zone '{zone}'.")
-        content = content[:years_open] + years_block + content[years_close:]
-    else:
-        content = content[:years_open] + "\n" + new_entry + content[years_open:]
-
-    INDEX_HTML.write_text(content, encoding="utf-8")
-    log(f"  Added '{run_key}' to zone '{zone}' in index.html", "OK")
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# STEP 4  —  Git commit + push
-# ──────────────────────────────────────────────────────────────────────────────
-
-def git_commit_push(json_filenames, date_str: str, cycle: str, source: str):
-    log("Git commit + push ...", "STEP")
-    label = _run_label(date_str, cycle, source)
-    if isinstance(json_filenames, str):
-        json_filenames = [json_filenames]
-    n = len(json_filenames)
-    msg = f"data: add ECMWF IFS forecast {label} ({n} zone{'s' if n != 1 else ''})"
-    for cmd in [
-        ["git", "-C", str(REPO_ROOT), "add", *json_filenames, "index.html"],
-        ["git", "-C", str(REPO_ROOT), "commit", "-m", msg],
-        ["git", "-C", str(REPO_ROOT), "push"],
-    ]:
-        r = subprocess.run(cmd, capture_output=True, text=True)
-        if r.returncode != 0:
-            log(f"git: {r.stderr.strip()}", "WARN")
-            break
-        log(f"  $ {' '.join(cmd[2:])}", "OK")
-
-
-# ──────────────────────────────────────────────────────────────────────────────
 # Main
 # ──────────────────────────────────────────────────────────────────────────────
 
+def _run_label(date_str, cycle, source, model):
+    d = datetime.strptime(date_str, "%Y%m%d")
+    if source == "cds":
+        src_tag = "ERA5/CDS"
+    elif model == "ifs":
+        src_tag = "ECMWF IFS open-data"
+    else:
+        src_tag = "ECMWF AIFS open-data"
+    return f"{d.strftime('%Y-%m-%d')} {cycle}Z ({src_tag})"
+
+
 def main():
     ap = argparse.ArgumentParser(
-        description="ECMWF IFS forecast pipeline: download -> convert -> deploy -> git push"
+        description="ECMWF forecast pipeline: download -> convert -> deploy -> git push"
     )
     ap.add_argument("--setup-cds",  action="store_true",
                     help="Save Copernicus CDS API credentials (run once for ERA5 mode)")
     ap.add_argument("--source",     default="opendata", choices=["opendata", "cds"],
-                    help="Data source: opendata (free IFS, default) or cds (ERA5, needs key)")
+                    help="Data source: opendata (free, default) or cds (ERA5, needs key)")
+    ap.add_argument("--model",      default="ifs", choices=["ifs", "aifs-single"],
+                    help="ifs (physics-based HRES, default) or aifs-single "
+                         "(ECMWF's AI forecast model). opendata source only.")
     ap.add_argument("--date",       default=None,
                     help="YYYYMMDD (default: today UTC; opendata: latest available)")
     ap.add_argument("--cycle",      default="00", choices=["00", "06", "12", "18"],
                     help="Forecast init cycle (default: 00)")
     ap.add_argument("--steps",      nargs="+", type=int, default=None,
-                    help="Forecast lead hours (default: 0 3 6 ... 72)")
+                    help="Forecast lead hours (default: IFS 0-72 by 3h, AIFS 0-72 by 6h)")
     ap.add_argument("--zone",       default=DEFAULT_ZONE,
                     help="index.html zone key, or 'all' to update every zone "
                          f"in one run ({', '.join(ZONE_BBOXES)}) (default: india_subcontinent)")
@@ -364,8 +251,8 @@ def main():
                     metavar=("W", "S", "E", "N"), default=None,
                     help="Bounding box W S E N (default: zone's known bbox, "
                          "or 67 7 98 38 for an unlisted zone). Ignored with --zone all.")
-    ap.add_argument("--max-steps",  type=int, default=25,
-                    help="Max timesteps in output JSON (default: 25 = 72h)")
+    ap.add_argument("--max-steps",  type=int, default=None,
+                    help="Max timesteps in output JSON (default: all downloaded steps)")
     ap.add_argument("--local-file", default=None,
                     help="Skip download; convert this local GRIB2/NC file")
     ap.add_argument("--no-git",     action="store_true",
@@ -379,13 +266,22 @@ def main():
 
     date_str = args.date or datetime.now(timezone.utc).strftime("%Y%m%d")
     cycle    = args.cycle
-    steps    = args.steps or DEFAULT_STEPS
     source   = args.source
+    model    = args.model
+    steps    = args.steps or (IFS_STEPS if model == "ifs" else AIFS_STEPS)
+    max_steps = args.max_steps or len(steps)
+
+    if source == "cds":
+        basin_key, model_tag, source_tag, file_tag = "ecmwf_ifs", "ERA5", "ERA5_CDS", "era5"
+    elif model == "ifs":
+        basin_key, model_tag, source_tag, file_tag = "ecmwf_ifs", "IFS", "ECMWF_IFS", "ifs"
+    else:
+        basin_key, model_tag, source_tag, file_tag = "ecmwf_aifs", "AIFS", "ECMWF_AIFS", "aifs"
 
     zones = list(ZONE_BBOXES) if args.zone == "all" else [args.zone]
 
-    log(f"ECMWF Pipeline — {date_str} {cycle}Z  source={source}", "STEP")
-    log(f"  zones={zones}  max_steps={args.max_steps}")
+    log(f"ECMWF Pipeline — {date_str} {cycle}Z  source={source}  model={model}", "STEP")
+    log(f"  zones={zones}  max_steps={max_steps}")
 
     # ── Step 1: Download (once, reused for every zone) ───────────────────────
     if args.local_file:
@@ -395,31 +291,35 @@ def main():
         log(f"Using local file: {src_path}", "OK")
     elif source == "opendata":
         RAW_DIR.mkdir(parents=True, exist_ok=True)
-        src_path = download_opendata(date_str, cycle, steps, RAW_DIR)
+        src_path = download_opendata(date_str, cycle, steps, RAW_DIR, model)
     else:  # cds
         RAW_DIR.mkdir(parents=True, exist_ok=True)
         dl_bbox = args.bbox or ZONE_BBOXES.get(zones[0], DEFAULT_BBOX)
         src_path = download_cds(date_str, cycle, dl_bbox, RAW_DIR)
 
+    run_key   = f"{date_str}_{cycle}Z"
+    run_label = _run_label(date_str, cycle, source, model)
+
     # ── Steps 2+3: Convert + deploy, per zone ─────────────────────────────────
     json_filenames = []
     for zone in zones:
         bbox = args.bbox if (args.bbox and args.zone != "all") else ZONE_BBOXES.get(zone, DEFAULT_BBOX)
-        json_filename = f"ecmwf_ifs_{zone}_{date_str}_{cycle}Z.json"
+        json_filename = f"ecmwf_{file_tag}_{zone}_{date_str}_{cycle}Z.json"
         json_path     = REPO_ROOT / json_filename
 
-        convert_to_json(src_path, json_path, bbox, args.max_steps)
-        patch_index_html(json_filename, date_str, cycle, source, zone)
+        convert_to_json(src_path, json_path, bbox, max_steps,
+                         source_tag=source_tag, model_tag=model_tag, precip_unit="m")
+        patch_index_html(basin_key, json_filename, run_key, run_label, zone)
         json_filenames.append(json_filename)
 
     # ── Step 4: Git ───────────────────────────────────────────────────────────
     if not args.no_git:
-        git_commit_push(json_filenames, date_str, cycle, source)
+        git_commit_push(json_filenames, f"add {run_label.split(' (')[0]} {model_tag} forecast")
 
     log("Pipeline complete!", "OK")
     for f in json_filenames:
         log(f"  New data: {f}")
-    log(f"  Open index.html to see the new ECMWF forecast run(s).")
+    log(f"  Open index.html to see the new forecast run(s).")
 
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-name: ECMWF IFS daily forecast update
+name: Daily forecast update (ECMWF IFS, ECMWF AIFS, NOAA GFS)
 
 on:
   schedule:
@@ -19,7 +19,7 @@ permissions:
 jobs:
   update-forecast:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
@@ -35,19 +35,33 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements.txt
 
-      - name: Run ECMWF pipeline (all zones)
+      - name: Run ECMWF IFS pipeline (all zones)
         run: >
           python ecmwf_pipeline.py
-          --source opendata
+          --source opendata --model ifs
           --cycle ${{ inputs.cycle || '00' }}
-          --zone all
-          --no-git
+          --zone all --no-git
 
-      - name: Commit and push updated forecast
+      - name: Run ECMWF AIFS pipeline (all zones)
+        continue-on-error: true   # AIFS open-data availability/params are less battle-tested than IFS
+        run: >
+          python ecmwf_pipeline.py
+          --source opendata --model aifs-single
+          --cycle ${{ inputs.cycle || '00' }}
+          --zone all --no-git
+
+      - name: Run NOAA GFS pipeline (all zones)
+        continue-on-error: true   # don't let a NOMADS hiccup block the IFS commit
+        run: >
+          python gfs_pipeline.py
+          --cycle ${{ inputs.cycle || '00' }}
+          --zone all --no-git
+
+      - name: Commit and push updated forecasts
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add ecmwf_ifs_*.json index.html
+          git add ecmwf_ifs_*.json ecmwf_aifs_*.json gfs_*.json index.html
           git diff --cached --quiet && echo "No forecast changes to commit." && exit 0
-          git commit -m "data: automated ECMWF IFS forecast update ($(date -u +%Y-%m-%d) $(echo ${{ inputs.cycle || '00' }})Z)"
+          git commit -m "data: automated forecast update ($(date -u +%Y-%m-%d) ${{ inputs.cycle || '00' }}Z, IFS/AIFS/GFS)"
           git push
