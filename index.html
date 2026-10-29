@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HydroClim Cast | Regional Forecast Intelligence · ECMWF IFS</title>
+    <link rel="icon" type="image/png" href="logo.png">
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
@@ -79,12 +80,13 @@
         }
         .brand { display: flex; align-items: center; gap: 8px; }
         .brand-mark {
-            width: 26px; height: 26px;
-            border-radius: 7px;
+            width: 28px; height: 28px;
+            border-radius: 50%;
             display: grid; place-items: center;
-            background: linear-gradient(135deg, var(--teal), #1a7f76);
-            font-size: 14px;
+            overflow: hidden;
+            flex-shrink: 0;
         }
+        .brand-mark img { width: 100%; height: 100%; object-fit: cover; }
         .brand-copy strong { display: block; font-size: 12.5px; letter-spacing: -0.2px; line-height: 1.2; }
         .brand-copy small { display: block; color: var(--muted); font-size: 9px; margin-top: 0; }
 
@@ -367,6 +369,20 @@
         }
         .mp-toggle-chevron { margin-left: auto; color: var(--muted); font-size: 11px; transition: transform 0.2s; }
 
+        /* Footer attribution — bottom center, non-interactive */
+        .footer-credit {
+            position: fixed;
+            left: 50%; bottom: 8px;
+            transform: translateX(-50%);
+            z-index: 390;
+            pointer-events: none;
+            text-align: center;
+            font: 600 10px 'DM Mono', monospace;
+            letter-spacing: 0.4px;
+            color: var(--muted);
+            text-shadow: 0 1px 4px rgba(0,0,0,0.6);
+        }
+
         /* Loading / no-data overlays */
         .loading-overlay {
             position: fixed; inset: 0;
@@ -409,6 +425,7 @@
             .info-card { display: none; }
             .brand-copy small { display: none; }
             .model-picker { width: calc(100vw - 36px); right: 18px; bottom: 96px; }
+            .footer-credit { display: none; }
         }
     </style>
 </head>
@@ -427,7 +444,7 @@
 
     <header class="topbar glass">
         <div class="brand">
-            <div class="brand-mark">🌊</div>
+            <div class="brand-mark"><img src="logo.png" alt="HydroClim Cast logo"></div>
             <div class="brand-copy">
                 <strong>HydroClim Cast</strong>
                 <small>Regional Forecast Intelligence</small>
@@ -496,6 +513,8 @@
             <span class="mp-toggle-chevron">⌃</span>
         </div>
     </div>
+
+    <div class="footer-credit">Made in HydroClimate Lab, IIT Kharagpur</div>
 
     <script>
         // ==========================================
