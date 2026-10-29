@@ -251,7 +251,7 @@ def read_netcdf(path: Path, bbox=None, max_steps=None):
                 if arr.ndim == 4:
                     arr = arr[:, 0, :, :]
                 raw[our_key] = arr
-                print(f"[ecmwf_to_json]  {our_key} ← NC var '{c}'")
+                print(f"[ecmwf_to_json]  {our_key} <- NC var '{c}'")
                 break
     nc.close()
     return _finalise(raw, lat, lon, time_strs, bbox, max_steps)
@@ -298,7 +298,7 @@ def _finalise(raw, lat, lon, time_strs, bbox, max_steps):
     # ── Build output ──────────────────────────────────────────────────────────
     keys_out = [k for k in ["temperature", "precipitation", "wind_speed", "specific_humidity"]
                 if k in raw]
-    print(f"[ecmwf_to_json]  Grid : {len(lon)}×{len(lat)}   Steps: {n_steps}   Vars: {keys_out}")
+    print(f"[ecmwf_to_json]  Grid : {len(lon)}x{len(lat)}   Steps: {n_steps}   Vars: {keys_out}")
 
     timesteps = []
     for t in range(n_steps):

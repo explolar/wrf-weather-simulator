@@ -203,7 +203,7 @@ def download_cds(date_str, cycle, bbox, out_dir: Path) -> Path:
 # ──────────────────────────────────────────────────────────────────────────────
 
 def convert_to_json(src_path: Path, json_path: Path, bbox, max_steps: int) -> Path:
-    log(f"Converting {src_path.name} → {json_path.name} ...", "STEP")
+    log(f"Converting {src_path.name} -> {json_path.name} ...", "STEP")
 
     if not CONVERTER.exists():
         abort(f"Converter not found: {CONVERTER}")
@@ -276,7 +276,7 @@ def patch_index_html(json_filename: str, date_str: str, cycle: str,
         content = content[:years_open] + "\n" + new_entry + content[years_open:]
 
     INDEX_HTML.write_text(content, encoding="utf-8")
-    log(f"  Added '{run_key}' → zone '{zone}' in index.html", "OK")
+    log(f"  Added '{run_key}' to zone '{zone}' in index.html", "OK")
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -305,7 +305,7 @@ def git_commit_push(json_filename: str, date_str: str, cycle: str, source: str):
 
 def main():
     ap = argparse.ArgumentParser(
-        description="ECMWF IFS forecast pipeline: download → convert → deploy → git push"
+        description="ECMWF IFS forecast pipeline: download -> convert -> deploy -> git push"
     )
     ap.add_argument("--setup-cds",  action="store_true",
                     help="Save Copernicus CDS API credentials (run once for ERA5 mode)")
@@ -316,7 +316,7 @@ def main():
     ap.add_argument("--cycle",      default="00", choices=["00", "06", "12", "18"],
                     help="Forecast init cycle (default: 00)")
     ap.add_argument("--steps",      nargs="+", type=int, default=None,
-                    help="Forecast lead hours (default: 0 3 6 … 72)")
+                    help="Forecast lead hours (default: 0 3 6 ... 72)")
     ap.add_argument("--zone",       default=DEFAULT_ZONE,
                     help="index.html zone key (default: india_subcontinent)")
     ap.add_argument("--bbox",       nargs=4, type=float,
