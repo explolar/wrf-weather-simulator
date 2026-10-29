@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HydroClim Cast | Regional Forecast Intelligence · NCMRWF 9km</title>
+    <title>HydroClim Cast | Regional Forecast Intelligence · ECMWF IFS</title>
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
@@ -481,20 +481,18 @@
                 }
             },
 
-            // ─────────────────────────────────────────────────────────────────
-            // NCMRWF 9 km NWP Forecast
-            // Source : National Centre for Medium Range Weather Forecasting
-            //          (Ministry of Earth Sciences, India)
-            //          Model: NEPS / UM-based deterministic runs at 9 km
-            // Data access: https://rds.ncmrwf.gov.in (GRIB2 / NetCDF)
-            // Converter : ncmrwf_to_json.py  (see repo root)
-            //   Usage   : python ncmrwf_to_json.py --input <file.nc>
-            //                     --bbox 67 7 98 38
-            //                     --output ncmrwf_9km_india_YYYYMMDD.json
-            // ─────────────────────────────────────────────────────────────────
-            "ncmrwf_9km": {
-                label: "NCMRWF 9 km Forecast (NWP)",
-                source: "ncmrwf",
+            // ---------------------------------------------------------------
+            // ECMWF IFS 0.25° Forecast  (~28 km public grid, IFS native ~9 km)
+            // Source   : European Centre for Medium-Range Weather Forecasts
+            // Data     : ecmwf-opendata (FREE, no auth, last 10 days)
+            //            OR Copernicus CDS via cdsapi (ERA5 / seasonal)
+            // Converter: ecmwf_to_json.py  (see repo root)
+            //   Usage  : python ecmwf_pipeline.py           # fully automated
+            //            python ecmwf_pipeline.py --local-file forecast.grib2
+            // ---------------------------------------------------------------
+            "ecmwf_ifs": {
+                label: "ECMWF IFS Forecast (0.25°)",
+                source: "ecmwf",
                 zones: {
                     "india_subcontinent": {
                         label: "India Subcontinent (full domain)",
@@ -502,15 +500,15 @@
                         dataBounds: [[7.0, 67.0], [36.0, 97.0]],
                         viewBounds: [[6.0, 65.0], [38.0, 100.0]],
                         zoom: 5,
-                        resolutionKm: 9,
+                        resolutionKm: 28,
                         years: {
                             "2026-placeholder": {
-                                dataFile: "ncmrwf_9km_india_placeholder.json",
+                                dataFile: "ecmwf_ifs_india_placeholder.json",
                                 label: "2026 Demo (placeholder grid)"
                             },
                             "operational": {
                                 dataFile: null,
-                                label: "Operational run (load via ncmrwf_to_json.py)"
+                                label: "Latest run (load via ecmwf_pipeline.py)"
                             }
                         }
                     },
@@ -624,8 +622,8 @@
             if (!basin || !badge) return;
             const src = basin.source || 'wrf';
             badge.className = 'source-badge ' + src;
-            if (src === 'ncmrwf') {
-                badge.innerHTML = '\uD83D\uDEF0 NCMRWF 9 km &middot; NEPS';
+            if (src === 'ecmwf') {
+                badge.innerHTML = '&#127760; ECMWF IFS &middot; 0.25&deg;';
             } else {
                 badge.innerHTML = '\uD83D\uDCBB WRF Simulation Output';
             }
@@ -763,7 +761,7 @@
             valMinLabel.innerText = globalMin.toFixed(decimals);
 
             const srcLabel = (basins[basinSelect.value] && basins[basinSelect.value].source === 'ncmrwf')
-                ? ' · NCMRWF 9km' : '';
+                ? ' · ECMWF IFS' : '';
             colorbarTitle.innerText = varDef ? `${varDef.label} (${varDef.unit})${srcLabel}` : 'Value';
         }
 
