@@ -95,34 +95,58 @@ def _get_with_retry(session, url, attempts=4, backoff=2.0, **kwargs):
     raise last_err
 
 
-def _grib_idx_ranges(session, idx_url, field_specs):
-    r = _get_with_retry(session, idx_url)
-    lines = [l for l in r.text.strip().splitlines() if l]
-    entries = []
-    for line in lines:
-        parts = line.split(":")
-        if len(parts) < 4:
-            continue   # malformed/truncated line (transient NOMADS hiccup) — skip it
-        offset = int(parts[1])
-        desc = ":".join(parts[3:])   # "PARAM:LEVEL:FCST_DESC:"
-        entries.append((offset, desc))
+def _grib_idx_ranges(session, idx_url, field_specs, attempts=4, backoff=2.0):
+    """
+    Fetch + parse one GFS .idx file. Retries the WHOLE fetch (not just the
+    HTTP GET) on bad content — NOMADS occasionally returns a 200 OK with an
+    HTML error/maintenance page instead of the real idx text under load, so
+    a transport-level retry alone doesn't catch it; this only shows up once
+    we try to parse the "idx" and find garbage (e.g. int() on a CSS
+    fragment like ' center; padding' from an HTML error page).
+    """
+    last_err = None
+    for attempt in range(attempts):
+        try:
+            r = session.get(idx_url, timeout=20)
+            r.raise_for_status()
+            lines = [l for l in r.text.strip().splitlines() if l]
+            entries = []
+            for line in lines:
+                parts = line.split(":")
+                if len(parts) < 4:
+                    continue   # malformed/truncated line — skip it
+                try:
+                    offset = int(parts[1])
+                except ValueError:
+                    continue   # not a real idx line (e.g. HTML error page content)
+                desc = ":".join(parts[3:])   # "PARAM:LEVEL:FCST_DESC:"
+                entries.append((offset, desc))
 
-    ranges = []
-    seen = set()
-    for i, (offset, desc) in enumerate(entries):
-        for param, level, extra in field_specs:
-            if not desc.startswith(f"{param}:{level}:"):
-                continue
-            if extra and not extra(desc):
-                continue
-            key = (param, level)
-            if key in seen:
-                break
-            seen.add(key)
-            end = entries[i + 1][0] - 1 if i + 1 < len(entries) else None
-            ranges.append((offset, end))
-            break
-    return ranges
+            if not entries:
+                raise ValueError(f"No valid idx entries parsed ({len(lines)} raw lines) — "
+                                  f"likely got a non-idx response (error/maintenance page)")
+
+            ranges = []
+            seen = set()
+            for i, (offset, desc) in enumerate(entries):
+                for param, level, extra in field_specs:
+                    if not desc.startswith(f"{param}:{level}:"):
+                        continue
+                    if extra and not extra(desc):
+                        continue
+                    key = (param, level)
+                    if key in seen:
+                        break
+                    seen.add(key)
+                    end = entries[i + 1][0] - 1 if i + 1 < len(entries) else None
+                    ranges.append((offset, end))
+                    break
+            return ranges
+        except Exception as e:
+            last_err = e
+            if attempt < attempts - 1:
+                time.sleep(backoff * (attempt + 1))
+    raise last_err
 
 
 def download_gfs(date_str, cycle, steps, out_dir: Path) -> Path:
