@@ -47,10 +47,9 @@ RAW_DIR  = REPO_ROOT / "raw_icon"
 DWD_BASE = "https://opendata.dwd.de/weather/nwp/icon/grib"
 BASIN_KEY = "icon"
 
-# 3-hourly (not hourly) by default — DWD is a free public service and this
-# already means ~80 small-file downloads per zone-set run; hourly would
-# triple that for little visible gain at India-regional scale.
-DEFAULT_STEPS = list(range(3, 73, 3))   # 3 h ... 72 h, 24 steps
+# 3-hourly out to 180h (7.5 days) — ICON's own cadence, and its max step
+# (confirmed live: f186 404s, f180 is the last published hour).
+DEFAULT_STEPS = list(range(3, 181, 3))   # 3 h ... 180 h, 59 steps
 
 # DWD param name -> (used for every zone's remap). CIN isn't published for
 # ICON's single-level open-data set (confirmed: not in the param directory

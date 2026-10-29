@@ -51,7 +51,12 @@ GFS_BASE = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod"
 BASIN_KEY = "gfs"
 
 # Skip f000 — no APCP message at init, would misalign the precip series.
-DEFAULT_STEPS = list(range(1, 73, 1))   # 1 h ... 72 h, 72 files (hourly)
+# Hourly out to 72h, then 3-hourly out to 240h (10 days) — GFS 0.25deg
+# actually publishes through 384h (confirmed live), but hourly/3-hourly
+# that far out means hundreds of small requests against a free public
+# server for diminishing forecast-skill return; 10 days is a reasonable
+# ceiling. Pass --steps explicitly for a longer run.
+DEFAULT_STEPS = list(range(1, 73, 1)) + list(range(75, 241, 3))   # 128 files, 10 days
 
 # (GRIB2 param, level, optional extra filter on the idx description).
 # APCP has two idx entries per hour beyond f003 — a cumulative "0-N hour
@@ -176,8 +181,8 @@ def main():
     ap.add_argument("--bbox",       nargs=4, type=float,
                     metavar=("W", "S", "E", "N"), default=None,
                     help="Bounding box W S E N (default: zone's known bbox). Ignored with --zone all.")
-    ap.add_argument("--max-steps",  type=int, default=72,
-                    help="Max timesteps in output JSON (default: 72 = hourly f001-f072)")
+    ap.add_argument("--max-steps",  type=int, default=None,
+                    help="Max timesteps in output JSON (default: all downloaded steps)")
     ap.add_argument("--local-file", default=None,
                     help="Skip download; convert this local GRIB2 file")
     ap.add_argument("--no-git",     action="store_true",
@@ -188,9 +193,10 @@ def main():
     cycle    = args.cycle
     steps    = args.steps or DEFAULT_STEPS
     zones    = list(ZONE_BBOXES) if args.zone == "all" else [args.zone]
+    max_steps = args.max_steps or len(steps)
 
     log(f"GFS Pipeline — {date_str} {cycle}Z", "STEP")
-    log(f"  zones={zones}  max_steps={args.max_steps}")
+    log(f"  zones={zones}  max_steps={max_steps}")
 
     if args.local_file:
         src_path = Path(args.local_file)

@@ -63,10 +63,12 @@ from forecast_common import (
 
 RAW_DIR = REPO_ROOT / "raw_ecmwf"
 
-# IFS HRES: 3-hourly out to 72h. AIFS-single: ECMWF only publishes it
-# 6-hourly, so it gets its own step list.
-IFS_STEPS  = list(range(0, 73, 3))    # 0 h … 72 h, 25 files
-AIFS_STEPS = list(range(0, 73, 6))    # 0 h … 72 h, 13 files
+# IFS HRES: 3-hourly out to 144h (6 days), then 6-hourly to 240h (10 days)
+# — that's where ECMWF's open-data cadence itself changes (confirmed live:
+# a 3-hourly step past 144h 404s). AIFS-single: 6-hourly throughout, to
+# 360h (15 days) — the longest range ECMWF publishes for it.
+IFS_STEPS  = list(range(0, 145, 3)) + list(range(150, 241, 6))   # 65 files, 10 days
+AIFS_STEPS = list(range(0, 361, 6))                              # 61 files, 15 days
 
 # ECMWF IFS open-data parameters (GRIB2 shortNames). AIFS-single's exact
 # published field set is less documented than IFS HRES's; same request is
