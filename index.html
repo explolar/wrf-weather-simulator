@@ -1514,6 +1514,18 @@
                 attribution: 'Tiles &copy; Esri &mdash; Source: USGS, Esri, TANA, DeLorme, and NPS'
             }).addTo(map);
 
+            // State/country boundaries + city/place labels, in their own pane
+            // above the data overlay (z-index 450 > overlayPane's 400) so
+            // names stay legible under the forecast colors, not under them.
+            map.createPane('labelsPane');
+            map.getPane('labelsPane').style.zIndex = 450;
+            map.getPane('labelsPane').style.pointerEvents = 'none';
+            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
+                maxZoom: 18,
+                maxNativeZoom: 13,
+                pane: 'labelsPane'
+            }).addTo(map);
+
             L.control.zoom({ position: 'bottomright' }).addTo(map);
 
             map.on('click', handlePointClick);
