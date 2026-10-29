@@ -57,22 +57,26 @@
         }
         .leaflet-control-attribution a { color: #7fdcd3 !important; }
 
-        /* Point-click detail popup */
-        .leaflet-popup-content-wrapper {
-            background: var(--panel-bg) !important;
-            backdrop-filter: blur(16px) saturate(140%);
-            border: 1px solid var(--line);
+        /* Point-click / search detail panel — fixed above the timeline bar,
+           not a floating Leaflet popup (which could land anywhere on the
+           map, including under other fixed panels on a small screen). */
+        .detail-panel {
+            position: fixed;
+            left: 18px; bottom: 100px;
+            width: 280px;
+            max-width: calc(100vw - 36px);
+            z-index: 420;
+            padding: 14px 16px;
             border-radius: 12px;
-            color: var(--ink);
-            box-shadow: 0 12px 32px rgba(0,0,0,0.5);
         }
-        .leaflet-popup-content { margin: 12px 14px; }
-        .leaflet-popup-tip { background: var(--panel-bg) !important; box-shadow: none !important; }
-        .leaflet-popup-close-button { color: var(--muted) !important; }
-        .leaflet-popup-close-button:hover { color: var(--ink) !important; }
+        .detail-panel-close {
+            position: absolute; top: 8px; right: 10px;
+            background: none; border: none; color: var(--muted);
+            font-size: 18px; line-height: 1; cursor: pointer; padding: 4px;
+        }
+        .detail-panel-close:hover { color: var(--ink); }
 
-        .point-popup { font-family: Manrope, sans-serif; }
-        .pp-coords { font: 700 11px 'DM Mono', monospace; letter-spacing: 0.3px; color: var(--teal); }
+        .pp-coords { font: 700 11px 'DM Mono', monospace; letter-spacing: 0.3px; color: var(--teal); padding-right: 18px; }
         .pp-time { font: 600 10px 'DM Mono', monospace; color: var(--muted); margin-top: 2px; margin-bottom: 9px; }
         .pp-rows { display: flex; flex-direction: column; gap: 5px; }
         .pp-row {
@@ -486,10 +490,7 @@
             .footer-credit { display: none; }
             .timeline-bar { width: calc(100vw - 36px); }
             .time-display { font-size: 0.64rem; }
-        }
-
-        @media (max-width: 420px) {
-            .layer-panel { top: 58px; }
+            .detail-panel { bottom: 150px; width: calc(100vw - 36px); }
         }
     </style>
 </head>
@@ -552,6 +553,13 @@
             </div>
         </div>
         <button id="toggleFreezeBtn" class="lock-btn">Unlock Map</button>
+    </div>
+
+    <div id="detailPanel" class="detail-panel glass hidden">
+        <button id="detailPanelClose" class="detail-panel-close" aria-label="Close">&times;</button>
+        <div class="pp-coords" id="dpCoords"></div>
+        <div class="pp-time" id="dpTime"></div>
+        <div class="pp-rows" id="dpRows"></div>
     </div>
 
     <div class="timeline-bar glass">
@@ -1186,17 +1194,21 @@
             timeStringIST.innerText = formatToIST(frameData.time);
         }
 
-        function handlePointClick(e) {
+        function showDetailAt(latlng, label) {
+            const detailPanel = document.getElementById('detailPanel');
             if (!currentDataset || !currentBounds) return;
             const bounds = L.latLngBounds(currentBounds);
-            if (!bounds.contains(e.latlng)) return;
+            if (!bounds.contains(latlng)) {
+                detailPanel.classList.add('hidden');
+                return;
+            }
 
             const width = currentDataset.metadata.grid_dimensions.width;
             const height = currentDataset.metadata.grid_dimensions.height;
             const sw = bounds.getSouthWest(), ne = bounds.getNorthEast();
 
-            const fracX = (e.latlng.lng - sw.lng) / (ne.lng - sw.lng);
-            const fracY = (e.latlng.lat - sw.lat) / (ne.lat - sw.lat);
+            const fracX = (latlng.lng - sw.lng) / (ne.lng - sw.lng);
+            const fracY = (latlng.lat - sw.lat) / (ne.lat - sw.lat);
             const col = Math.max(0, Math.min(width - 1, Math.round(fracX * (width - 1))));
             const row = Math.max(0, Math.min(height - 1, Math.round(fracY * (height - 1))));
             const arrayIdx = row * width + col;
@@ -1210,17 +1222,15 @@
                 return `<div class="pp-row${active}"><span class="pp-row-label">${v.label}</span><span class="pp-row-val">${val} <small>${v.unit}</small></span></div>`;
             }).join('');
 
-            const html = `
-                <div class="point-popup">
-                    <div class="pp-coords">${e.latlng.lat.toFixed(3)}°, ${e.latlng.lng.toFixed(3)}°</div>
-                    <div class="pp-time">${formatToIST(frameData.time)}</div>
-                    <div class="pp-rows">${rowsHtml}</div>
-                </div>`;
+            document.getElementById('dpCoords').textContent =
+                label || `${latlng.lat.toFixed(3)}°, ${latlng.lng.toFixed(3)}°`;
+            document.getElementById('dpTime').textContent = formatToIST(frameData.time);
+            document.getElementById('dpRows').innerHTML = rowsHtml;
+            detailPanel.classList.remove('hidden');
+        }
 
-            L.popup({ className: 'point-popup-wrap', maxWidth: 220 })
-                .setLatLng(e.latlng)
-                .setContent(html)
-                .openOn(map);
+        function handlePointClick(e) {
+            showDetailAt(e.latlng);
         }
 
         function applyMapState() {
@@ -1291,6 +1301,7 @@
 
             updateSourceBadge();
             if (isPlaying) togglePlayback();
+            document.getElementById('detailPanel').classList.add('hidden');
 
             if (currentOverlay && map) {
                 map.removeLayer(currentOverlay);
@@ -1404,6 +1415,10 @@
             applyMapState();
         });
 
+        document.getElementById('detailPanelClose').addEventListener('click', () => {
+            document.getElementById('detailPanel').classList.add('hidden');
+        });
+
         function geocodeAndFly(query) {
             query = query.trim();
             if (!query || !map) return;
@@ -1422,12 +1437,14 @@
                         return;
                     }
                     const { lat, lon, display_name } = results[0];
+                    const latlng = L.latLng(parseFloat(lat), parseFloat(lon));
                     if (isMapFrozen) {
                         isMapFrozen = false;
                         applyMapState();
                     }
-                    map.flyTo([parseFloat(lat), parseFloat(lon)], 9, { duration: 1.1 });
+                    map.flyTo(latlng, 9, { duration: 1.1 });
                     input.title = display_name;
+                    showDetailAt(latlng, display_name.split(',').slice(0, 2).join(','));
                 })
                 .catch(err => {
                     console.warn('Geocode failed:', err);
