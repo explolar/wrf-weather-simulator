@@ -36,3 +36,4 @@ IF %ERRORLEVEL% EQU 0 (
     echo [ERR] Failed. Run this script as Administrator.
 )
 pause
+

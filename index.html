@@ -202,28 +202,15 @@
         .run-forecast-btn:hover { background: rgba(251,191,36,0.14); }
         .run-forecast-btn.queued { border-style: solid; border-color: #fbbf24; color: #fbbf24; cursor: default; }
 
-        /* NCMRWF source badge */
+        /* Source badge */
         .source-badge {
             display: inline-flex; align-items: center; gap: 5px;
             margin-top: 8px; padding: 5px 10px;
             border-radius: 7px; font: 700 10px 'DM Mono', monospace;
             letter-spacing: 0.8px; width: 100%; justify-content: center;
         }
-        .source-badge.wrf    { background: rgba(34,211,197,0.10); color: var(--teal); border: 1px solid rgba(34,211,197,0.25); }
-        .source-badge.ncmrwf { background: rgba(99,102,241,0.12); color: #a5b4fc;   border: 1px solid rgba(99,102,241,0.30); }
-
-        /* Resolution tag inside info-card */
-        .res-tag { font: 600 9px 'DM Mono', monospace; letter-spacing: 1px; color: var(--muted); margin-bottom: 4px; }
-
-        /* NCMRWF source badge */
-        .source-badge {
-            display: inline-flex; align-items: center; gap: 5px;
-            margin-top: 8px; padding: 5px 10px;
-            border-radius: 7px; font: 700 10px 'DM Mono', monospace;
-            letter-spacing: 0.8px; width: 100%; justify-content: center;
-        }
-        .source-badge.wrf    { background: rgba(34,211,197,0.10); color: var(--teal); border: 1px solid rgba(34,211,197,0.25); }
-        .source-badge.ncmrwf { background: rgba(99,102,241,0.12); color: #a5b4fc;   border: 1px solid rgba(99,102,241,0.30); }
+        .source-badge.wrf   { background: rgba(34,211,197,0.10); color: var(--teal); border: 1px solid rgba(34,211,197,0.25); }
+        .source-badge.ecmwf { background: rgba(99,102,241,0.12); color: #a5b4fc;   border: 1px solid rgba(99,102,241,0.30); }
 
         /* Resolution tag inside info-card */
         .res-tag { font: 600 9px 'DM Mono', monospace; letter-spacing: 1px; color: var(--muted); margin-bottom: 4px; }
@@ -394,7 +381,6 @@
                 <select id="yearSelect" class="control-select"></select>
                 <button id="runForecastBtn" class="run-forecast-btn hidden">Run forecast for this zone</button>
                 <div id="sourceBadge" class="source-badge wrf">💻 WRF Simulation Output</div>
-                <div id="sourceBadge" class="source-badge wrf">💻 WRF Simulation Output</div>
             </div>
             <div class="field-block">
                 <label>FORECAST LAYER</label>
@@ -405,7 +391,6 @@
 
     <div class="info-card glass">
         <div class="info-card-label"><span>◈</span><span>LIVE LAYER</span></div>
-        <div class="res-tag" id="resTag"></div>
         <div class="res-tag" id="resTag"></div>
         <div class="info-card-title" id="colorbarTitle">Unit</div>
         <div class="colorbar-row">
@@ -518,7 +503,7 @@
                         dataBounds: [[8.0, 67.0], [30.0, 78.0]],
                         viewBounds: [[7.0, 65.0], [32.0, 80.0]],
                         zoom: 5,
-                        resolutionKm: 9,
+                        resolutionKm: 28,
                         years: {
                             "operational": { dataFile: null, label: "Operational run (not yet loaded)" }
                         }
@@ -529,7 +514,7 @@
                         dataBounds: [[8.0, 80.0], [27.0, 97.0]],
                         viewBounds: [[7.0, 79.0], [28.0, 99.0]],
                         zoom: 5,
-                        resolutionKm: 9,
+                        resolutionKm: 28,
                         years: {
                             "operational": { dataFile: null, label: "Operational run (not yet loaded)" }
                         }
@@ -540,7 +525,7 @@
                         dataBounds: [[27.0, 70.0], [36.0, 95.0]],
                         viewBounds: [[26.0, 68.0], [37.0, 97.0]],
                         zoom: 5,
-                        resolutionKm: 9,
+                        resolutionKm: 28,
                         years: {
                             "operational": { dataFile: null, label: "Operational run (not yet loaded)" }
                         }
@@ -624,26 +609,6 @@
             badge.className = 'source-badge ' + src;
             if (src === 'ecmwf') {
                 badge.innerHTML = '&#127760; ECMWF IFS &middot; 0.25&deg;';
-            } else {
-                badge.innerHTML = '\uD83D\uDCBB WRF Simulation Output';
-            }
-            if (resTagEl) {
-                const zone = basin.zones[locationSelect.value];
-                resTagEl.innerText = (zone && zone.resolutionKm)
-                    ? zone.resolutionKm + ' km grid resolution'
-                    : '';
-            }
-        }
-
-        function updateSourceBadge() {
-            const basin = basins[basinSelect.value];
-            const badge = document.getElementById('sourceBadge');
-            const resTagEl = document.getElementById('resTag');
-            if (!basin || !badge) return;
-            const src = basin.source || 'wrf';
-            badge.className = 'source-badge ' + src;
-            if (src === 'ncmrwf') {
-                badge.innerHTML = '\uD83D\uDEF0 NCMRWF 9 km &middot; NEPS';
             } else {
                 badge.innerHTML = '\uD83D\uDCBB WRF Simulation Output';
             }
