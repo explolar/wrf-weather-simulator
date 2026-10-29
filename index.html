@@ -57,6 +57,35 @@
         }
         .leaflet-control-attribution a { color: #7fdcd3 !important; }
 
+        /* Point-click detail popup */
+        .leaflet-popup-content-wrapper {
+            background: var(--panel-bg) !important;
+            backdrop-filter: blur(16px) saturate(140%);
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            color: var(--ink);
+            box-shadow: 0 12px 32px rgba(0,0,0,0.5);
+        }
+        .leaflet-popup-content { margin: 12px 14px; }
+        .leaflet-popup-tip { background: var(--panel-bg) !important; box-shadow: none !important; }
+        .leaflet-popup-close-button { color: var(--muted) !important; }
+        .leaflet-popup-close-button:hover { color: var(--ink) !important; }
+
+        .point-popup { font-family: Manrope, sans-serif; }
+        .pp-coords { font: 700 11px 'DM Mono', monospace; letter-spacing: 0.3px; color: var(--teal); }
+        .pp-time { font: 600 10px 'DM Mono', monospace; color: var(--muted); margin-top: 2px; margin-bottom: 9px; }
+        .pp-rows { display: flex; flex-direction: column; gap: 5px; }
+        .pp-row {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 10px; padding: 5px 7px;
+            border-radius: 6px;
+            font-size: 0.76rem;
+        }
+        .pp-row.active { background: rgba(34,211,197,0.12); }
+        .pp-row-label { color: var(--muted); font-weight: 600; }
+        .pp-row-val { font: 700 12px 'DM Mono', monospace; color: var(--ink); }
+        .pp-row-val small { font-weight: 500; color: var(--muted); font-size: 9px; }
+
         /* Glass panel base */
         .glass {
             background: var(--panel-bg);
@@ -1051,6 +1080,43 @@
             timeStringIST.innerText = formatToIST(frameData.time);
         }
 
+        function handlePointClick(e) {
+            if (!currentDataset || !currentBounds) return;
+            const bounds = L.latLngBounds(currentBounds);
+            if (!bounds.contains(e.latlng)) return;
+
+            const width = currentDataset.metadata.grid_dimensions.width;
+            const height = currentDataset.metadata.grid_dimensions.height;
+            const sw = bounds.getSouthWest(), ne = bounds.getNorthEast();
+
+            const fracX = (e.latlng.lng - sw.lng) / (ne.lng - sw.lng);
+            const fracY = (e.latlng.lat - sw.lat) / (ne.lat - sw.lat);
+            const col = Math.max(0, Math.min(width - 1, Math.round(fracX * (width - 1))));
+            const row = Math.max(0, Math.min(height - 1, Math.round(fracY * (height - 1))));
+            const arrayIdx = row * width + col;
+
+            const frameData = currentDataset.timesteps[currentFrame];
+            const rowsHtml = variables.map(v => {
+                const arr = frameData.data[v.key];
+                if (!arr || arr[arrayIdx] === undefined) return '';
+                const val = arr[arrayIdx].toFixed(v.decimals);
+                const active = v.key === currentVariable ? ' active' : '';
+                return `<div class="pp-row${active}"><span class="pp-row-label">${v.label}</span><span class="pp-row-val">${val} <small>${v.unit}</small></span></div>`;
+            }).join('');
+
+            const html = `
+                <div class="point-popup">
+                    <div class="pp-coords">${e.latlng.lat.toFixed(3)}°, ${e.latlng.lng.toFixed(3)}°</div>
+                    <div class="pp-time">${formatToIST(frameData.time)}</div>
+                    <div class="pp-rows">${rowsHtml}</div>
+                </div>`;
+
+            L.popup({ className: 'point-popup-wrap', maxWidth: 220 })
+                .setLatLng(e.latlng)
+                .setContent(html)
+                .openOn(map);
+        }
+
         function applyMapState() {
             if (!map) return;
             const zone = getCurrentZoneConfig();
@@ -1270,6 +1336,8 @@
             }).addTo(map);
 
             L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+            map.on('click', handlePointClick);
 
             loadIndiaOutline();
 
