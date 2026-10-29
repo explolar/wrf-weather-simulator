@@ -39,7 +39,11 @@ USAGE
   python ecmwf_pipeline.py --no-git
 
   # Narrow region  (West India)
-  python ecmwf_pipeline.py --zone west_india --bbox 67 7 78 30
+  python ecmwf_pipeline.py --zone west_india
+
+  # Every zone in one run (1 download, N conversions, 1 commit) — used by
+  # schedule_ecmwf.bat for the daily automated run
+  python ecmwf_pipeline.py --zone all
 """
 
 import argparse
@@ -63,6 +67,15 @@ RAW_DIR    = REPO_ROOT / "raw_ecmwf"
 DEFAULT_BBOX = [67.0, 7.0, 98.0, 38.0]    # India
 DEFAULT_ZONE = "india_subcontinent"
 DEFAULT_STEPS = list(range(0, 73, 3))       # 0 h … 72 h in 3-h steps (25 files)
+
+# All index.html zones under ecmwf_ifs, with their W S E N bbox.
+# --zone all downloads the GRIB2 once and converts it for every zone here.
+ZONE_BBOXES = {
+    "india_subcontinent": [67.0, 7.0, 98.0, 38.0],
+    "west_india":         [67.0, 8.0, 78.0, 30.0],
+    "east_india":         [80.0, 8.0, 97.0, 27.0],
+    "north_india":        [70.0, 27.0, 95.0, 36.0],
+}
 
 # ECMWF IFS open-data parameters (GRIB2 shortNames)
 OPENDATA_PARAMS = ["2t", "tp", "10u", "10v", "2d"]
@@ -262,16 +275,40 @@ def patch_index_html(json_filename: str, date_str: str, cycle: str,
     if zone_pos == -1:
         abort(f"Zone '{zone}' not found inside ecmwf_ifs.")
 
-    years_pos  = content.find('"years"', zone_pos)
+    years_pos = content.find('years:', zone_pos)
+    if years_pos == -1:
+        abort(f"'years:' block not found for zone '{zone}'.")
     years_open = content.find('{', years_pos) + 1
+    if years_open == 0:
+        abort(f"Could not locate opening brace of 'years:' block for zone '{zone}'.")
 
-    # Replace existing entry for same key
-    if f'"{run_key}"' in content[years_open: years_open + 3000]:
+    # Find the matching closing brace for this zone's years block (brace counting),
+    # so entry lookup/replacement stays scoped to THIS zone and never touches others.
+    depth = 1
+    years_close = years_open
+    for i in range(years_open, len(content)):
+        if content[i] == '{':
+            depth += 1
+        elif content[i] == '}':
+            depth -= 1
+            if depth == 0:
+                years_close = i
+                break
+    else:
+        abort(f"Could not locate closing brace of 'years:' block for zone '{zone}'.")
+
+    years_block = content[years_open:years_close]
+
+    # Replace existing entry for same key (scoped to this zone's years block only)
+    if f'"{run_key}"' in years_block:
         log(f"  Entry '{run_key}' exists — replacing.", "WARN")
         old_re = re.compile(
-            rf'(\s*"{re.escape(run_key)}":\s*{{[^}}]*}},?\n?)', re.DOTALL
+            rf'\s*"{re.escape(run_key)}":\s*{{[^}}]*}},?\n?', re.DOTALL
         )
-        content = old_re.sub(new_entry, content, count=1)
+        years_block, n = old_re.subn(new_entry, years_block, count=1)
+        if n == 0:
+            abort(f"Could not locate existing '{run_key}' entry to replace in zone '{zone}'.")
+        content = content[:years_open] + years_block + content[years_close:]
     else:
         content = content[:years_open] + "\n" + new_entry + content[years_open:]
 
@@ -283,12 +320,15 @@ def patch_index_html(json_filename: str, date_str: str, cycle: str,
 # STEP 4  —  Git commit + push
 # ──────────────────────────────────────────────────────────────────────────────
 
-def git_commit_push(json_filename: str, date_str: str, cycle: str, source: str):
+def git_commit_push(json_filenames, date_str: str, cycle: str, source: str):
     log("Git commit + push ...", "STEP")
     label = _run_label(date_str, cycle, source)
-    msg = f"data: add ECMWF IFS forecast {label}"
+    if isinstance(json_filenames, str):
+        json_filenames = [json_filenames]
+    n = len(json_filenames)
+    msg = f"data: add ECMWF IFS forecast {label} ({n} zone{'s' if n != 1 else ''})"
     for cmd in [
-        ["git", "-C", str(REPO_ROOT), "add", json_filename, "index.html"],
+        ["git", "-C", str(REPO_ROOT), "add", *json_filenames, "index.html"],
         ["git", "-C", str(REPO_ROOT), "commit", "-m", msg],
         ["git", "-C", str(REPO_ROOT), "push"],
     ]:
@@ -318,10 +358,12 @@ def main():
     ap.add_argument("--steps",      nargs="+", type=int, default=None,
                     help="Forecast lead hours (default: 0 3 6 ... 72)")
     ap.add_argument("--zone",       default=DEFAULT_ZONE,
-                    help="index.html zone key (default: india_subcontinent)")
+                    help="index.html zone key, or 'all' to update every zone "
+                         f"in one run ({', '.join(ZONE_BBOXES)}) (default: india_subcontinent)")
     ap.add_argument("--bbox",       nargs=4, type=float,
-                    metavar=("W", "S", "E", "N"), default=DEFAULT_BBOX,
-                    help="Bounding box W S E N (default: 67 7 98 38 = India)")
+                    metavar=("W", "S", "E", "N"), default=None,
+                    help="Bounding box W S E N (default: zone's known bbox, "
+                         "or 67 7 98 38 for an unlisted zone). Ignored with --zone all.")
     ap.add_argument("--max-steps",  type=int, default=25,
                     help="Max timesteps in output JSON (default: 25 = 72h)")
     ap.add_argument("--local-file", default=None,
@@ -340,13 +382,12 @@ def main():
     steps    = args.steps or DEFAULT_STEPS
     source   = args.source
 
+    zones = list(ZONE_BBOXES) if args.zone == "all" else [args.zone]
+
     log(f"ECMWF Pipeline — {date_str} {cycle}Z  source={source}", "STEP")
-    log(f"  bbox={args.bbox}  zone={args.zone}  max_steps={args.max_steps}")
+    log(f"  zones={zones}  max_steps={args.max_steps}")
 
-    json_filename = f"ecmwf_ifs_{date_str}_{cycle}Z.json"
-    json_path     = REPO_ROOT / json_filename
-
-    # ── Step 1: Download ──────────────────────────────────────────────────────
+    # ── Step 1: Download (once, reused for every zone) ───────────────────────
     if args.local_file:
         src_path = Path(args.local_file)
         if not src_path.exists():
@@ -357,21 +398,28 @@ def main():
         src_path = download_opendata(date_str, cycle, steps, RAW_DIR)
     else:  # cds
         RAW_DIR.mkdir(parents=True, exist_ok=True)
-        src_path = download_cds(date_str, cycle, args.bbox, RAW_DIR)
+        dl_bbox = args.bbox or ZONE_BBOXES.get(zones[0], DEFAULT_BBOX)
+        src_path = download_cds(date_str, cycle, dl_bbox, RAW_DIR)
 
-    # ── Step 2: Convert ───────────────────────────────────────────────────────
-    convert_to_json(src_path, json_path, args.bbox, args.max_steps)
+    # ── Steps 2+3: Convert + deploy, per zone ─────────────────────────────────
+    json_filenames = []
+    for zone in zones:
+        bbox = args.bbox if (args.bbox and args.zone != "all") else ZONE_BBOXES.get(zone, DEFAULT_BBOX)
+        json_filename = f"ecmwf_ifs_{zone}_{date_str}_{cycle}Z.json"
+        json_path     = REPO_ROOT / json_filename
 
-    # ── Step 3: Deploy ────────────────────────────────────────────────────────
-    patch_index_html(json_filename, date_str, cycle, source, args.zone)
+        convert_to_json(src_path, json_path, bbox, args.max_steps)
+        patch_index_html(json_filename, date_str, cycle, source, zone)
+        json_filenames.append(json_filename)
 
     # ── Step 4: Git ───────────────────────────────────────────────────────────
     if not args.no_git:
-        git_commit_push(json_filename, date_str, cycle, source)
+        git_commit_push(json_filenames, date_str, cycle, source)
 
     log("Pipeline complete!", "OK")
-    log(f"  New data: {json_filename}")
-    log(f"  Open index.html to see the new ECMWF forecast run.")
+    for f in json_filenames:
+        log(f"  New data: {f}")
+    log(f"  Open index.html to see the new ECMWF forecast run(s).")
 
 
 if __name__ == "__main__":

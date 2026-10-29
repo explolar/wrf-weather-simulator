@@ -1,0 +1,5 @@
+ecmwf-opendata
+cfgrib
+eccodes
+netCDF4
+numpy

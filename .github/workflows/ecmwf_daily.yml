@@ -1,0 +1,53 @@
+name: ECMWF IFS daily forecast update
+
+on:
+  schedule:
+    # 05:00 UTC ≈ 10:30 IST — well after the 00Z run is published (~4-6h lag)
+    - cron: "0 5 * * *"
+  workflow_dispatch:
+    inputs:
+      cycle:
+        description: "Forecast init cycle"
+        required: false
+        default: "00"
+        type: choice
+        options: ["00", "06", "12", "18"]
+
+permissions:
+  contents: write
+
+jobs:
+  update-forecast:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install system eccodes library
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libeccodes0 libeccodes-dev
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run ECMWF pipeline (all zones)
+        run: >
+          python ecmwf_pipeline.py
+          --source opendata
+          --cycle ${{ inputs.cycle || '00' }}
+          --zone all
+          --no-git
+
+      - name: Commit and push updated forecast
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add ecmwf_ifs_*.json index.html
+          git diff --cached --quiet && echo "No forecast changes to commit." && exit 0
+          git commit -m "data: automated ECMWF IFS forecast update ($(date -u +%Y-%m-%d) $(echo ${{ inputs.cycle || '00' }})Z)"
+          git push

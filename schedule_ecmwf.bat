@@ -17,7 +17,7 @@ schtasks /Delete /TN "%TASK_NAME%" /F >nul 2>&1
 :: Register daily task at 09:00 IST
 schtasks /Create ^
   /TN "%TASK_NAME%" ^
-  /TR "\"%PYTHON%\" \"%REPO%\ecmwf_pipeline.py\" --source opendata --cycle 00" ^
+  /TR "\"%PYTHON%\" \"%REPO%\ecmwf_pipeline.py\" --source opendata --cycle 00 --zone all" ^
   /SC DAILY ^
   /ST 09:00 ^
   /RU "%USERNAME%" ^
