@@ -142,12 +142,29 @@
 
 
         /* Layer picker — floating top-left */
-        .layer-panel {
+        .search-box {
             position: fixed;
             top: 64px; left: 14px;
             width: 212px;
             z-index: 400;
-            max-height: calc(100vh - 170px);
+            display: flex; align-items: center; gap: 7px;
+            padding: 9px 12px;
+            border-radius: 10px;
+        }
+        .search-box svg { flex-shrink: 0; color: var(--muted); }
+        .search-box input {
+            flex: 1; min-width: 0;
+            background: transparent; border: none; outline: none;
+            color: var(--ink); font-size: 0.78rem; font-family: inherit;
+        }
+        .search-box input::placeholder { color: var(--muted); }
+
+        .layer-panel {
+            position: fixed;
+            top: 112px; left: 14px;
+            width: 212px;
+            z-index: 400;
+            max-height: calc(100vh - 218px);
             display: flex;
             flex-direction: column;
             overflow: hidden;
@@ -451,6 +468,7 @@
         ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
 
         @media (max-width: 820px) {
+            .search-box { width: calc(100vw - 36px); }
             .layer-panel { width: calc(100vw - 36px); max-height: calc(100vh - 320px); }
             .layer-panel.collapsed { max-height: none; }
             .info-card { display: none; }
@@ -488,6 +506,11 @@
             </div>
         </div>
     </header>
+
+    <div class="search-box glass">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="searchInput" placeholder="Search location..." autocomplete="off">
+    </div>
 
     <div id="layerPanel" class="layer-panel glass">
         <div class="layer-panel-head" id="layerPanelToggle">
@@ -1232,6 +1255,8 @@
 
                 calculateGlobalBounds(currentVariable);
                 renderFrame();
+
+                if (!isPlaying && totalFrames > 1) togglePlayback();
             } catch (err) {
                 console.error("Error fetching or constructing the grid layout data:", err);
                 showNoDataState(true);
@@ -1282,6 +1307,42 @@
         toggleFreezeBtn.addEventListener('click', () => {
             isMapFrozen = !isMapFrozen;
             applyMapState();
+        });
+
+        function geocodeAndFly(query) {
+            query = query.trim();
+            if (!query || !map) return;
+            const input = document.getElementById('searchInput');
+            const prevPlaceholder = input.placeholder;
+            input.value = '';
+            input.placeholder = 'Searching…';
+
+            fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`)
+                .then(r => r.json())
+                .then(results => {
+                    input.placeholder = prevPlaceholder;
+                    if (!results.length) {
+                        input.placeholder = 'No results — try again';
+                        setTimeout(() => { input.placeholder = prevPlaceholder; }, 2000);
+                        return;
+                    }
+                    const { lat, lon, display_name } = results[0];
+                    if (isMapFrozen) {
+                        isMapFrozen = false;
+                        applyMapState();
+                    }
+                    map.flyTo([parseFloat(lat), parseFloat(lon)], 9, { duration: 1.1 });
+                    input.title = display_name;
+                })
+                .catch(err => {
+                    console.warn('Geocode failed:', err);
+                    input.placeholder = 'Search failed — try again';
+                    setTimeout(() => { input.placeholder = prevPlaceholder; }, 2000);
+                });
+        }
+
+        document.getElementById('searchInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') geocodeAndFly(e.target.value);
         });
 
         runForecastBtn.addEventListener('click', () => {
