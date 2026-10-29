@@ -206,17 +206,20 @@ def main():
     else:
         src_path = download_gfs(date_str, cycle, steps, RAW_DIR)
 
-    run_key = f"{date_str}_{cycle}Z"
+    # Fixed filename + "operational" key, overwritten every run — see
+    # ecmwf_pipeline.py for why (not date-stamped, to stop the repo growing
+    # a new file per day forever).
+    run_key = "operational"
     d = datetime.strptime(date_str, "%Y%m%d")
     run_label = f"{d.strftime('%Y-%m-%d')} {cycle}Z (NOAA GFS open-data)"
 
     json_filenames = []
     for zone in zones:
         bbox = args.bbox if (args.bbox and args.zone != "all") else ZONE_BBOXES.get(zone)
-        json_filename = f"gfs_{zone}_{date_str}_{cycle}Z.json"
+        json_filename = f"gfs_{zone}_latest.json"
         json_path     = REPO_ROOT / json_filename
 
-        convert_to_json(src_path, json_path, bbox, args.max_steps,
+        convert_to_json(src_path, json_path, bbox, max_steps,
                          source_tag="NOAA_GFS", model_tag="GFS", precip_unit="mm")
         patch_index_html(BASIN_KEY, json_filename, run_key, run_label, zone)
         json_filenames.append(json_filename)

@@ -1,6 +1,7 @@
 ecmwf-opendata
 cfgrib
 eccodes
+xarray
 netCDF4
 numpy
 requests

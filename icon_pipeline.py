@@ -227,7 +227,10 @@ def main():
     clat_path, clon_path = RAW_DIR / "CLAT.grib2", RAW_DIR / "CLON.grib2"
     remap = build_remap_indices(clat_path, clon_path, zones)
 
-    run_key = f"{date_str}_{cycle}Z"
+    # Fixed filename + "operational" key, overwritten every run — see
+    # ecmwf_pipeline.py for why (not date-stamped, to stop the repo growing
+    # a new file per day forever).
+    run_key = "operational"
     d = datetime.strptime(date_str, "%Y%m%d")
     run_label = f"{d.strftime('%Y-%m-%d')} {cycle}Z (DWD ICON open-data)"
 
@@ -238,7 +241,7 @@ def main():
         metadata, timesteps = convert_zone(zone, nn_idx, lat_1d, lon_1d, steps,
                                             step_files, date_str, cycle, max_steps)
 
-        json_filename = f"icon_{zone}_{date_str}_{cycle}Z.json"
+        json_filename = f"icon_{zone}_latest.json"
         json_path = REPO_ROOT / json_filename
         import json as json_mod
         with open(json_path, "w") as f:

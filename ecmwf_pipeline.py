@@ -304,14 +304,17 @@ def main():
         dl_bbox = args.bbox or ZONE_BBOXES.get(zones[0], DEFAULT_BBOX)
         src_path = download_cds(date_str, cycle, dl_bbox, RAW_DIR)
 
-    run_key   = f"{date_str}_{cycle}Z"
+    # Fixed filename + "operational" key, overwritten every run — not date-
+    # stamped. A new file per day would grow the repo forever; the run's
+    # actual date/time is still shown to users via run_label.
+    run_key   = "operational"
     run_label = _run_label(date_str, cycle, source, model)
 
     # ── Steps 2+3: Convert + deploy, per zone ─────────────────────────────────
     json_filenames = []
     for zone in zones:
         bbox = args.bbox if (args.bbox and args.zone != "all") else ZONE_BBOXES.get(zone, DEFAULT_BBOX)
-        json_filename = f"ecmwf_{file_tag}_{zone}_{date_str}_{cycle}Z.json"
+        json_filename = f"ecmwf_{file_tag}_{zone}_latest.json"
         json_path     = REPO_ROOT / json_filename
 
         convert_to_json(src_path, json_path, bbox, max_steps,
