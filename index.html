@@ -1330,9 +1330,10 @@
                 zoomControl: false
             }).setView([22, 82], 5);
 
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Terrain_Base/MapServer/tile/{z}/{y}/{x}', {
                 maxZoom: 18,
-                attribution: '&copy; OpenStreetMap'
+                maxNativeZoom: 13,
+                attribution: 'Tiles &copy; Esri &mdash; Source: USGS, Esri, TANA, DeLorme, and NPS'
             }).addTo(map);
 
             L.control.zoom({ position: 'bottomright' }).addTo(map);
